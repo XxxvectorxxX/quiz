@@ -1,6 +1,6 @@
 import { generateText } from "ai"
 
-export type AIProvider = "openai" | "groq" | "anthropic" | "google" | "custom"
+export type AIProvider = "openai" | "groq" | "anthropic" | "google" | "routellm"
 
 interface AIConfig {
   provider: AIProvider
@@ -21,13 +21,14 @@ export function getAIConfig(): AIConfig {
 export function getModelString(): string {
   const config = getAIConfig()
 
-  // Se tiver API key customizada, usa o formato provider/model
-  if (config.apiKey) {
-    return `${config.provider}/${config.model}`
+  if (!config.apiKey) {
+    throw new Error(
+      "API key de IA não configurada. Configure AI_PROVIDER e AI_API_KEY no arquivo .env.local. Veja o README para instruções.",
+    )
   }
 
-  // Senão usa o AI Gateway padrão do Vercel
-  return `openai/${config.model}`
+  // Usa o formato provider/model com a API key configurada
+  return `${config.provider}/${config.model}`
 }
 
 export async function generateAIText(prompt: string) {
