@@ -2,7 +2,7 @@ import { generateObject } from "ai"
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { getModelString } from "@/lib/ai-config"
+import { getAIModel } from "@/lib/ai-config"
 
 const questionSchema = z.object({
   questions: z.array(
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     const basePrompt = difficultyPrompts[profile.age_category] || difficultyPrompts.adultos
 
     const { object } = await generateObject({
-      model: getModelString(),
+      model: getAIModel(),
       schema: questionSchema,
       prompt: `Você é um especialista em Bíblia evangélica pentecostal. Gere 10 perguntas bíblicas para ${basePrompt}
 
