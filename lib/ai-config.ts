@@ -1,6 +1,13 @@
 import { generateText } from "ai"
+import { createOpenAI } from "@ai-sdk/openai"
 
-export type AIProvider = "openai" | "groq" | "anthropic" | "google" | "routellm"
+export type AIProvider =
+  | "openai"
+  | "groq"
+  | "anthropic"
+  | "google"
+  | "routellm"
+  | "custom"
 
 interface AIConfig {
   provider: AIProvider
@@ -18,24 +25,42 @@ export function getAIConfig(): AIConfig {
   return { provider, apiKey, model, baseURL }
 }
 
-export function getModelString(): string {
+export function getAIModel() {
   const config = getAIConfig()
 
   if (!config.apiKey) {
     throw new Error(
-      "API key de IA não configurada. Configure AI_PROVIDER e AI_API_KEY no arquivo .env.local. Veja o README para instruções.",
+      "API key de IA não configurada. Configure AI_PROVIDER e AI_API_KEY no .env.local.",
     )
   }
 
-  // Usa o formato provider/model com a API key configurada
+  /**
+   * ✅ RouteLLM / Abacus / OpenAI-compatible
+   */
+  if (config.provider === "routellm" || config.provider === "custom" || config.baseURL) {
+    if (!config.baseURL) {
+      throw new Error("AI_BASE_URL é obrigatório para provedores customizados")
+    }
+
+    const openaiProvider = createOpenAI({
+      apiKey: config.apiKey,
+      baseURL: config.baseURL,
+    })
+
+    return openaiProvider.chat(config.model)
+  }
+
+  /**
+   * ✅ Providers padrão via string
+   */
   return `${config.provider}/${config.model}`
 }
 
 export async function generateAIText(prompt: string) {
-  const modelString = getModelString()
+  const model = getAIModel()
 
   return await generateText({
-    model: modelString,
+    model,
     prompt,
   })
 }
