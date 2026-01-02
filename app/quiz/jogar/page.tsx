@@ -1,211 +1,347 @@
-import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+"use client"
+
+import { useEffect, useState } from "react"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import { BookOpen, Trophy, Target, Flame, Sparkles, Users, Award } from "lucide-react"
-import Link from "next/link"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useRouter } from "next/navigation"
+import { CheckCircle, XCircle, Loader2, Sparkles, Flame } from "lucide-react"
 
-export default async function QuizPage() {
-  const supabase = await createClient()
+interface Question {
+  id: string
+  question_text: string
+  correct_answer: string
+  wrong_answers: string[]
+  bible_reference: string
+  topic: string
+}
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
-    redirect("/auth/login")
+interface Answer {
+  question_id: string
+  selected_answer: string
+  correct_answer: string
+  is_correct: boolean
+}
+
+export default function JogarQuizPage() {
+  const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
+  const [questionsAnswered, setQuestionsAnswered] = useState(0)
+  const [answers, setAnswers] = useState<Answer[]>([])
+  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
+  const [showResult, setShowResult] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [profile, setProfile] = useState<any>(null)
+  const [useAI, setUseAI] = useState(false)
+  const [currentStreak, setCurrentStreak] = useState(0)
+  const [isLoadingNext, setIsLoadingNext] = useState(false)
+  const router = useRouter()
+  const supabase = createClient()
+
+  useEffect(() => {
+    loadQuiz()
+  }, [])
+
+  const loadQuiz = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        router.push("/auth/login")
+        return
+      }
+
+      const { data: profileData } = await supabase.from("profiles").select("*").eq("id", user.id).single()
+      setProfile(profileData)
+
+      if (!profileData) return
+
+      const urlParams = new URLSearchParams(window.location.search)
+      const aiMode = urlParams.get("ai") === "true"
+      setUseAI(aiMode)
+
+      const { data: session } = await supabase
+        .from("quiz_sessions")
+        .insert({
+          user_id: user.id,
+          competition_mode: "individual",
+          questions: [],
+        })
+        .select()
+        .single()
+
+      setSessionId(session?.id)
+
+      // Load first question
+      await loadNextQuestion(session?.id, aiMode)
+    } catch (error) {
+      console.error("[v0] Error loading quiz:", error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
-  const { data: progress } = await supabase.from("user_progress").select("*").eq("user_id", user.id).single()
+  const loadNextQuestion = async (sid: string, aiMode: boolean) => {
+    setIsLoadingNext(true)
+    try {
+      const response = await fetch("/api/proxima-pergunta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: sid, useAI: aiMode }),
+      })
 
-  if (!profile) {
-    redirect("/auth/login")
+      const data = await response.json()
+      if (data.success && data.question) {
+        setCurrentQuestion(data.question)
+      }
+    } catch (error) {
+      console.error("[v0] Error loading next question:", error)
+    } finally {
+      setIsLoadingNext(false)
+    }
   }
 
-  const ageCategoryLabels: Record<string, string> = {
-    criancas: "Crianças",
-    adolescentes: "Adolescentes",
-    jovens: "Jovens",
-    adultos: "Adultos",
-    casais: "Casais",
+  const handleAnswerSelect = (answer: string) => {
+    if (showResult) return
+    setSelectedAnswer(answer)
   }
+
+  const handleSubmitAnswer = async () => {
+    if (!selectedAnswer || !currentQuestion) return
+
+    const isCorrect = selectedAnswer === currentQuestion.correct_answer
+
+    const newAnswer: Answer = {
+      question_id: currentQuestion.id,
+      selected_answer: selectedAnswer,
+      correct_answer: currentQuestion.correct_answer,
+      is_correct: isCorrect,
+    }
+
+    setAnswers([...answers, newAnswer])
+    setShowResult(true)
+
+    if (isCorrect) {
+      setCurrentStreak(currentStreak + 1)
+    } else {
+      setCurrentStreak(0)
+    }
+
+    if (!useAI && currentQuestion.id) {
+      await supabase.from("answered_questions").insert({
+        user_id: profile.id,
+        question_id: currentQuestion.id,
+      })
+    }
+
+    // Update progress immediately
+    await updateProgress(isCorrect)
+  }
+
+  const updateProgress = async (isCorrect: boolean) => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: progress } = await supabase.from("user_progress").select("*").eq("user_id", user.id).single()
+
+      if (progress) {
+        const newCorrectAnswers = progress.correct_answers + (isCorrect ? 1 : 0)
+        const newTotalQuestions = progress.total_questions_answered + 1
+        const accuracyRate = (newCorrectAnswers / newTotalQuestions) * 100
+
+        let newLevel = progress.current_level
+        if (accuracyRate >= 85 && newTotalQuestions >= newLevel * 8) {
+          newLevel++
+        }
+
+        await supabase
+          .from("user_progress")
+          .update({
+            current_level: newLevel,
+            total_questions_answered: newTotalQuestions,
+            correct_answers: newCorrectAnswers,
+            weekly_progress: progress.weekly_progress + 1,
+          })
+          .eq("user_id", user.id)
+      }
+
+      // Update session
+      await supabase
+        .from("quiz_sessions")
+        .update({
+          answers: [...answers, { question_id: currentQuestion?.id, is_correct: isCorrect }],
+          score: answers.filter((a) => a.is_correct).length + (isCorrect ? 1 : 0),
+        })
+        .eq("id", sessionId)
+    } catch (error) {
+      console.error("[v0] Error updating progress:", error)
+    }
+  }
+
+  const handleNextQuestion = async () => {
+    setQuestionsAnswered(questionsAnswered + 1)
+    setSelectedAnswer(null)
+    setShowResult(false)
+    setCurrentQuestion(null)
+    await loadNextQuestion(sessionId!, useAI)
+  }
+
+  const handleFinishQuiz = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) return
+
+      const score = answers.filter((a) => a.is_correct).length
+
+      await supabase
+        .from("quiz_sessions")
+        .update({
+          completed: true,
+          completed_at: new Date().toISOString(),
+          score,
+        })
+        .eq("id", sessionId)
+
+      router.push(`/quiz/resultado/${sessionId}`)
+    } catch (error) {
+      console.error("[v0] Error finishing quiz:", error)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-svh items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          <p className="text-muted-foreground">{useAI ? "Gerando perguntas com IA..." : "Carregando perguntas..."}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!currentQuestion && !isLoadingNext) {
+    return (
+      <div className="flex min-h-svh items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50">
+        <Card>
+          <CardHeader>
+            <CardTitle>Erro ao carregar pergunta</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground mb-4">Não foi possível carregar a próxima pergunta.</p>
+            <Button onClick={() => router.push("/quiz")}>Voltar</Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (isLoadingNext || !currentQuestion) {
+    return (
+      <div className="flex min-h-svh items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          <p className="text-muted-foreground">Carregando próxima pergunta...</p>
+        </div>
+      </div>
+    )
+  }
+
+  const allAnswers = [currentQuestion.correct_answer, ...currentQuestion.wrong_answers].sort(() => Math.random() - 0.5)
 
   return (
-    <div className="min-h-svh kid-friendly-bg">
-      <header className="border-b-4 border-purple-300 bg-white/80 backdrop-blur-sm sticky top-0 z-10 shadow-lg">
-        <div className="container mx-auto px-4 py-6 flex justify-between items-center">
-          <Link href="/quiz" className="flex items-center gap-3">
-            <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl shadow-lg">
-              <BookOpen className="h-8 w-8 text-white" />
-            </div>
-            <h1 className="text-3xl font-black bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-              Quiz Bíblico
-            </h1>
-          </Link>
-          <div className="flex items-center gap-4">
-            <span className="text-base font-bold text-purple-700 hidden sm:block">
-              Olá, {profile.full_name || "Jogador"}! 👋
-            </span>
-            <Button variant="outline" size="lg" className="border-2 border-purple-400 font-bold bg-transparent" asChild>
-              <Link href="/perfil">Meu Perfil</Link>
-            </Button>
+    <div className="min-h-svh bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      <div className="container mx-auto px-4 py-8 max-w-3xl">
+        {useAI && (
+          <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-purple-600" />
+            <p className="text-sm text-purple-900 font-medium">Perguntas geradas por IA com dificuldade progressiva</p>
           </div>
-        </div>
-      </header>
+        )}
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10">
-          <Card className="kid-card border-4 border-blue-300 bg-gradient-to-br from-blue-50 to-blue-100">
-            <CardContent className="pt-8">
-              <div className="flex flex-col items-center gap-3">
-                <div className="p-3 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 shadow-lg">
-                  <Target className="h-8 w-8 text-white" />
-                </div>
-                <p className="text-4xl font-black text-blue-700">{progress?.current_level || 1}</p>
-                <p className="text-sm font-bold text-blue-600">Nível</p>
-              </div>
+        <div className="mb-8 grid grid-cols-3 gap-4">
+          <Card>
+            <CardContent className="pt-4">
+              <p className="text-2xl font-bold text-blue-600">{questionsAnswered}</p>
+              <p className="text-xs text-muted-foreground">Respondidas</p>
             </CardContent>
           </Card>
-
-          <Card className="kid-card border-4 border-green-300 bg-gradient-to-br from-green-50 to-green-100">
-            <CardContent className="pt-8">
-              <div className="flex flex-col items-center gap-3">
-                <div className="p-3 rounded-full bg-gradient-to-br from-green-400 to-green-600 shadow-lg">
-                  <Trophy className="h-8 w-8 text-white" />
-                </div>
-                <p className="text-4xl font-black text-green-700">{progress?.correct_answers || 0}</p>
-                <p className="text-sm font-bold text-green-600">Acertos</p>
-              </div>
+          <Card>
+            <CardContent className="pt-4">
+              <p className="text-2xl font-bold text-green-600">{answers.filter((a) => a.is_correct).length}</p>
+              <p className="text-xs text-muted-foreground">Corretas</p>
             </CardContent>
           </Card>
-
-          <Card className="kid-card border-4 border-orange-300 bg-gradient-to-br from-orange-50 to-orange-100">
-            <CardContent className="pt-8">
-              <div className="flex flex-col items-center gap-3">
-                <div className="p-3 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 shadow-lg">
-                  <Flame className="h-8 w-8 text-white" />
-                </div>
-                <p className="text-4xl font-black text-orange-700">{progress?.current_streak || 0}</p>
-                <p className="text-sm font-bold text-orange-600">Sequência</p>
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex items-center gap-2">
+                <Flame className="h-5 w-5 text-orange-500" />
+                <p className="text-2xl font-bold text-orange-600">{currentStreak}</p>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="kid-card border-4 border-purple-300 bg-gradient-to-br from-purple-50 to-purple-100">
-            <CardContent className="pt-8">
-              <div className="flex flex-col items-center gap-3">
-                <div className="p-3 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 shadow-lg">
-                  <BookOpen className="h-8 w-8 text-white" />
-                </div>
-                <p className="text-4xl font-black text-purple-700">{progress?.total_questions_answered || 0}</p>
-                <p className="text-sm font-bold text-purple-600">Perguntas</p>
-              </div>
+              <p className="text-xs text-muted-foreground">Sequência</p>
             </CardContent>
           </Card>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 mb-10">
-          <Card className="kid-card border-4 border-blue-400 hover:border-blue-600 bg-gradient-to-br from-blue-50 to-white">
-            <CardHeader className="text-center">
-              <div className="flex justify-center mb-3">
-                <div className="p-4 bg-gradient-to-br from-blue-400 to-blue-600 rounded-3xl shadow-lg">
-                  <BookOpen className="h-12 w-12 text-white" />
-                </div>
-              </div>
-              <CardTitle className="text-2xl font-black text-blue-700">Quiz Clássico</CardTitle>
-              <CardDescription className="text-base font-bold text-blue-600">
-                Nível: {ageCategoryLabels[profile.age_category]}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button size="lg" className="w-full kid-button bg-gradient-to-r from-blue-500 to-blue-700" asChild>
-                <Link href="/quiz/jogar">Começar Agora! 🎮</Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="kid-card border-4 border-purple-400 hover:border-purple-600 bg-gradient-to-br from-purple-50 to-pink-50">
-            <CardHeader className="text-center">
-              <div className="flex justify-center mb-3">
-                <div className="p-4 bg-gradient-to-br from-purple-400 to-pink-600 rounded-3xl shadow-lg animate-pulse">
-                  <Sparkles className="h-12 w-12 text-white" />
-                </div>
-              </div>
-              <CardTitle className="text-2xl font-black text-purple-700">Quiz com IA Mágica</CardTitle>
-              <CardDescription className="text-base font-bold text-purple-600">
-                Perguntas feitas especialmente pra você!
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button size="lg" className="w-full kid-button bg-gradient-to-r from-purple-500 to-pink-600" asChild>
-                <Link href="/quiz/jogar?ai=true">Jogar com IA! ✨</Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="kid-card border-4 border-green-400 hover:border-green-600 bg-gradient-to-br from-green-50 to-white">
-            <CardHeader className="text-center">
-              <div className="flex justify-center mb-3">
-                <div className="p-4 bg-gradient-to-br from-green-400 to-green-600 rounded-3xl shadow-lg">
-                  <Users className="h-12 w-12 text-white" />
-                </div>
-              </div>
-              <CardTitle className="text-2xl font-black text-green-700">Competições</CardTitle>
-              <CardDescription className="text-base font-bold text-green-600">
-                Desafie seus amigos em times!
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button
-                size="lg"
-                variant="outline"
-                className="w-full kid-button border-4 border-green-500 text-green-700 hover:bg-green-100 bg-transparent"
-                asChild
-              >
-                <Link href="/competicoes">Ver Times! 🏆</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card className="kid-card border-4 border-yellow-400 bg-gradient-to-r from-yellow-50 via-orange-50 to-pink-50">
+        <Card className="mb-6">
           <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl shadow-lg">
-                <Award className="h-8 w-8 text-white" />
-              </div>
-              <div>
-                <CardTitle className="text-2xl font-black text-orange-700">Desafio da Semana!</CardTitle>
-                <CardDescription className="text-base font-bold text-orange-600">
-                  Complete {progress?.weekly_goal || 5} quizzes para ganhar um troféu!
-                </CardDescription>
-              </div>
-            </div>
+            <CardTitle className="text-xl leading-relaxed">{currentQuestion.question_text}</CardTitle>
+            <p className="text-sm text-muted-foreground">{currentQuestion.bible_reference}</p>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <div className="flex justify-between text-lg font-bold">
-                <span className="text-orange-700">Seu progresso:</span>
-                <span className="text-orange-600">
-                  {progress?.weekly_progress || 0} / {progress?.weekly_goal || 5}
-                </span>
-              </div>
-              <div className="h-6 bg-orange-200 rounded-full overflow-hidden border-2 border-orange-400">
-                <div
-                  className="h-full bg-gradient-to-r from-yellow-400 to-orange-500 transition-all duration-500 shadow-inner"
-                  style={{
-                    width: `${Math.min(((progress?.weekly_progress || 0) / (progress?.weekly_goal || 5)) * 100, 100)}%`,
-                  }}
-                />
-              </div>
-              {progress?.weekly_progress >= progress?.weekly_goal && (
-                <p className="text-center text-xl font-black text-green-600 animate-bounce">
-                  🎉 Parabéns! Você completou o desafio! 🎉
-                </p>
-              )}
+              {allAnswers.map((answer, index) => {
+                const isSelected = selectedAnswer === answer
+                const isCorrect = answer === currentQuestion.correct_answer
+                const showCorrect = showResult && isCorrect
+                const showWrong = showResult && isSelected && !isCorrect
+
+                return (
+                  <button
+                    key={index}
+                    onClick={() => handleAnswerSelect(answer)}
+                    disabled={showResult}
+                    className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+                      showCorrect
+                        ? "border-green-500 bg-green-50"
+                        : showWrong
+                          ? "border-destructive bg-red-50"
+                          : isSelected
+                            ? "border-blue-500 bg-blue-50"
+                            : "border-border hover:border-blue-300 bg-card"
+                    } ${showResult ? "cursor-not-allowed" : "cursor-pointer"}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{answer}</span>
+                      {showCorrect && <CheckCircle className="h-5 w-5 text-green-600" />}
+                      {showWrong && <XCircle className="h-5 w-5 text-destructive" />}
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           </CardContent>
         </Card>
+
+        <div className="flex justify-between gap-4">
+          <Button variant="outline" onClick={handleFinishQuiz}>
+            Finalizar Quiz
+          </Button>
+          {!showResult ? (
+            <Button onClick={handleSubmitAnswer} disabled={!selectedAnswer} size="lg">
+              Confirmar Resposta
+            </Button>
+          ) : (
+            <Button onClick={handleNextQuestion} size="lg">
+              Próxima Pergunta
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   )
