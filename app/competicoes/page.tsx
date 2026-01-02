@@ -15,6 +15,32 @@ export default async function CompeticoesPage() {
     redirect("/auth/login")
   }
 
+  const { data: competitionsConfig } = await supabase
+    .from("system_config")
+    .select("config_value")
+    .eq("config_key", "competitions_enabled")
+    .single()
+
+  const competitionsEnabled = competitionsConfig?.config_value === "true" || competitionsConfig?.config_value === true
+
+  if (!competitionsEnabled) {
+    return (
+      <div className="min-h-svh bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle>Competições Desabilitadas</CardTitle>
+            <CardDescription>O sistema de competições está temporariamente desabilitado.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild className="w-full">
+              <Link href="/quiz">Voltar ao Quiz</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
   // Get user's teams

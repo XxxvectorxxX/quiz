@@ -1,81 +1,102 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { BookOpen, Users, Trophy, Zap } from "lucide-react"
+import { BookOpen, Users, Trophy, Zap, Star, Heart, Sparkles } from "lucide-react"
 import Link from "next/link"
 
 export default function HomePage() {
   return (
-    <div className="min-h-svh bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <div className="min-h-svh kid-friendly-bg">
       {/* Hero Section */}
-      <section className="container mx-auto px-4 py-20 text-center">
-        <h1 className="text-5xl md:text-6xl font-bold text-blue-600 mb-6 text-balance">Quiz Bíblico</h1>
-        <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto text-pretty">
-          Teste seus conhecimentos sobre a Palavra de Deus e desafie seus amigos em competições bíblicas emocionantes
+      <section className="container mx-auto px-4 py-12 text-center">
+        <div className="mb-6 flex items-center justify-center gap-4">
+          <Star className="h-12 w-12 text-yellow-500 animate-pulse" />
+          <h1 className="text-6xl md:text-7xl font-black bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 bg-clip-text text-transparent text-balance">
+            Quiz Bíblico
+          </h1>
+          <Heart className="h-12 w-12 text-pink-500 animate-pulse" />
+        </div>
+        <p className="text-2xl md:text-3xl font-bold text-purple-700 mb-4">Uma Aventura pela Bíblia!</p>
+        <p className="text-xl text-purple-600 mb-10 max-w-3xl mx-auto text-pretty font-medium">
+          Descubra histórias incríveis, aprenda sobre Jesus e seus ensinamentos, e divirta-se respondendo perguntas
+          bíblicas com seus amigos!
         </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Button size="lg" asChild className="text-lg">
-            <Link href="/auth/cadastro">Começar Agora</Link>
+        <div className="flex flex-col sm:flex-row gap-6 justify-center">
+          <Button
+            size="lg"
+            asChild
+            className="kid-button bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+          >
+            <Link href="/auth/cadastro">
+              <Sparkles className="h-6 w-6 mr-2" />
+              Começar Aventura! 🚀
+            </Link>
           </Button>
-          <Button size="lg" variant="outline" asChild className="text-lg bg-transparent">
-            <Link href="/auth/login">Entrar</Link>
+          <Button
+            size="lg"
+            variant="outline"
+            asChild
+            className="kid-button border-4 border-purple-400 text-purple-700 hover:bg-purple-100 bg-transparent"
+          >
+            <Link href="/auth/login">Já tenho conta 😊</Link>
           </Button>
         </div>
       </section>
 
       {/* Features Section */}
-      <section className="container mx-auto px-4 py-16">
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card>
-            <CardContent className="pt-6">
+      <section className="container mx-auto px-4 py-12">
+        <h2 className="text-4xl font-black text-center text-purple-700 mb-10">O que você vai encontrar:</h2>
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <Card className="kid-card border-4 border-blue-300 bg-gradient-to-br from-blue-50 to-blue-100">
+            <CardContent className="pt-8">
               <div className="flex flex-col items-center text-center gap-4">
-                <div className="p-3 rounded-full bg-blue-100">
-                  <BookOpen className="h-8 w-8 text-blue-600" />
+                <div className="p-4 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 shadow-lg">
+                  <BookOpen className="h-10 w-10 text-white" />
                 </div>
-                <h3 className="font-semibold text-lg">Níveis por Idade</h3>
-                <p className="text-sm text-muted-foreground">
-                  Perguntas adaptadas para crianças, adolescentes, jovens, adultos e casais
+                <h3 className="font-black text-2xl text-blue-700">Para Todas as Idades</h3>
+                <p className="text-base text-blue-600 font-medium leading-relaxed">
+                  Perguntas especiais para crianças, adolescentes, jovens, adultos e até casais!
                 </p>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="pt-6">
+          <Card className="kid-card border-4 border-purple-300 bg-gradient-to-br from-purple-50 to-purple-100">
+            <CardContent className="pt-8">
               <div className="flex flex-col items-center text-center gap-4">
-                <div className="p-3 rounded-full bg-purple-100">
-                  <Zap className="h-8 w-8 text-purple-600" />
+                <div className="p-4 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 shadow-lg">
+                  <Zap className="h-10 w-10 text-white" />
                 </div>
-                <h3 className="font-semibold text-lg">IA Inteligente</h3>
-                <p className="text-sm text-muted-foreground">
-                  Perguntas geradas por IA com dificuldade progressiva baseada no seu desempenho
+                <h3 className="font-black text-2xl text-purple-700">Inteligência Artificial</h3>
+                <p className="text-base text-purple-600 font-medium leading-relaxed">
+                  Perguntas novas toda hora, feitas por uma IA inteligente que se adapta ao seu nível!
                 </p>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="pt-6">
+          <Card className="kid-card border-4 border-green-300 bg-gradient-to-br from-green-50 to-green-100">
+            <CardContent className="pt-8">
               <div className="flex flex-col items-center text-center gap-4">
-                <div className="p-3 rounded-full bg-green-100">
-                  <Users className="h-8 w-8 text-green-600" />
+                <div className="p-4 rounded-full bg-gradient-to-br from-green-400 to-green-600 shadow-lg">
+                  <Users className="h-10 w-10 text-white" />
                 </div>
-                <h3 className="font-semibold text-lg">Competições</h3>
-                <p className="text-sm text-muted-foreground">
-                  Jogue sozinho ou em equipes de 1v1 até 5v5 e desafie seus amigos
+                <h3 className="font-black text-2xl text-green-700">Jogue com Amigos</h3>
+                <p className="text-base text-green-600 font-medium leading-relaxed">
+                  Crie times e desafie seus amigos em competições super divertidas de 1v1 até 5v5!
                 </p>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="pt-6">
+          <Card className="kid-card border-4 border-orange-300 bg-gradient-to-br from-orange-50 to-orange-100">
+            <CardContent className="pt-8">
               <div className="flex flex-col items-center text-center gap-4">
-                <div className="p-3 rounded-full bg-orange-100">
-                  <Trophy className="h-8 w-8 text-orange-600" />
+                <div className="p-4 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 shadow-lg">
+                  <Trophy className="h-10 w-10 text-white" />
                 </div>
-                <h3 className="font-semibold text-lg">Rankings</h3>
-                <p className="text-sm text-muted-foreground">
-                  Acompanhe seu progresso e veja sua posição nos rankings globais
+                <h3 className="font-black text-2xl text-orange-700">Rankings e Troféus</h3>
+                <p className="text-base text-orange-600 font-medium leading-relaxed">
+                  Suba de nível, ganhe troféus e veja sua posição nos rankings globais!
                 </p>
               </div>
             </CardContent>
@@ -85,12 +106,19 @@ export default function HomePage() {
 
       {/* CTA Section */}
       <section className="container mx-auto px-4 py-16">
-        <Card className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-          <CardContent className="py-12 text-center">
-            <h2 className="text-3xl font-bold mb-4">Pronto para testar seus conhecimentos?</h2>
-            <p className="text-lg mb-6 text-blue-50">Cadastre-se agora e comece sua jornada bíblica</p>
-            <Button size="lg" variant="secondary" asChild>
-              <Link href="/auth/cadastro">Criar Conta Grátis</Link>
+        <Card className="kid-card bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 text-white border-0 shadow-2xl">
+          <CardContent className="py-16 text-center">
+            <h2 className="text-4xl md:text-5xl font-black mb-6 text-balance">Pronto para a Aventura Bíblica? 🌟</h2>
+            <p className="text-xl md:text-2xl mb-8 font-bold">É grátis e super fácil de começar!</p>
+            <Button
+              size="lg"
+              className="kid-button bg-white text-purple-700 hover:bg-yellow-300 hover:scale-110"
+              asChild
+            >
+              <Link href="/auth/cadastro">
+                Criar Minha Conta Agora! 🎮
+                <Sparkles className="h-6 w-6 ml-2" />
+              </Link>
             </Button>
           </CardContent>
         </Card>

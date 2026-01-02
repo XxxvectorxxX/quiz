@@ -194,6 +194,21 @@ export default async function AdminPage() {
               </Button>
             </CardContent>
           </Card>
+
+          <Card className="border-2 hover:border-slate-300 transition-colors">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ScrollText className="h-5 w-5" />
+                Configurações
+              </CardTitle>
+              <CardDescription>Configure funcionalidades e integrações do sistema</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button className="w-full bg-slate-600 hover:bg-slate-700" asChild>
+                <Link href="/admin/configuracoes">Configurar Sistema</Link>
+              </Button>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Recent Activity Logs */}

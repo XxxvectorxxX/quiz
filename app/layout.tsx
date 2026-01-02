@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
+import { AdminNav } from "@/components/admin-nav"
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
@@ -10,7 +11,7 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Quiz Bíblico - Teste seus conhecimentos sobre a Palavra",
   description:
-    "Desafie seus conhecimentos bíblicos com perguntas adaptadas por idade. Compete sozinho ou em equipes e acompanhe seu progresso.",
+    "Desafie seus conhecimentos bíblicos com perguntas adaptadas por idade. Competa sozinho ou em equipes e acompanhe seu progresso.",
   generator: "v0.app",
   icons: {
     icon: [
@@ -40,6 +41,7 @@ export default function RootLayout({
     <html lang="pt-BR">
       <body className={`font-sans antialiased`}>
         {children}
+        <AdminNav />
         <Analytics />
       </body>
     </html>

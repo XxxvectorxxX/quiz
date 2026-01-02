@@ -2,6 +2,7 @@ import { generateObject } from "ai"
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 import { z } from "zod"
+import { getModelString } from "@/lib/ai-config"
 
 const questionSchema = z.object({
   questions: z.array(
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
     console.log("[v0] Generating questions with AI for difficulty:", difficulty_level)
 
     const { object } = await generateObject({
-      model: "openai/gpt-4o-mini",
+      model: getModelString(),
       schema: questionSchema,
       prompt: `Você é um especialista em Bíblia evangélica pentecostal. Gere exatamente ${count} perguntas bíblicas para ${prompt}
 
