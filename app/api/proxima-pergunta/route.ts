@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 import { generateObject } from "ai"
 import { z } from "zod"
-import { getModelString } from "@/lib/ai-config"
+import { getAIModel } from "@/lib/ai-config"
 
 const questionSchema = z.object({
   question_text: z.string(),
@@ -19,21 +19,32 @@ export async function POST(request: Request) {
     const {
       data: { user },
     } = await supabase.auth.getUser()
+
     if (!user) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
     }
 
     const { sessionId, useAI } = await request.json()
 
-    // Get user profile and progress
-    const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
-    const { data: progress } = await supabase.from("user_progress").select("*").eq("user_id", user.id).single()
+    // Perfil do usuário
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single()
+
+    // Progresso do usuário
+    const { data: progress } = await supabase
+      .from("user_progress")
+      .select("*")
+      .eq("user_id", user.id)
+      .single()
 
     if (!profile) {
       return NextResponse.json({ error: "Perfil não encontrado" }, { status: 404 })
     }
 
-    // Get answered questions to avoid repetition
+    // Perguntas já respondidas
     const { data: answeredQuestions } = await supabase
       .from("answered_questions")
       .select("question_id")
@@ -41,18 +52,25 @@ export async function POST(request: Request) {
 
     const answeredIds = answeredQuestions?.map((q) => q.question_id) || []
 
-    // Get current session to analyze recent performance
-    const { data: session } = await supabase.from("quiz_sessions").select("*").eq("id", sessionId).single()
+    // Sessão atual
+    const { data: session } = await supabase
+      .from("quiz_sessions")
+      .select("*")
+      .eq("id", sessionId)
+      .single()
 
     let nextQuestion
 
     if (useAI) {
-      // Calculate recent accuracy for progressive difficulty
-      const recentAnswers = (session?.answers || []).slice(-5) // Last 5 answers
+      // Últimas 5 respostas
+      const recentAnswers = (session?.answers || []).slice(-5)
       const recentCorrect = recentAnswers.filter((a: any) => a.is_correct).length
-      const recentAccuracy = recentAnswers.length > 0 ? (recentCorrect / recentAnswers.length) * 100 : 70
+      const recentAccuracy =
+        recentAnswers.length > 0
+          ? (recentCorrect / recentAnswers.length) * 100
+          : 70
 
-      // Progressive difficulty adjustment
+      // Ajuste progressivo de dificuldade
       let difficultyLevel = "média"
       if (recentAccuracy >= 90) difficultyLevel = "muito difícil"
       else if (recentAccuracy >= 80) difficultyLevel = "difícil"
@@ -69,17 +87,29 @@ export async function POST(request: Request) {
       }
 
       const { object } = await generateObject({
-        model: getModelString(),
+        model: getAIModel(), // ✅ CORRETO
         schema: questionSchema,
-        prompt: `Gere UMA pergunta bíblica para ${difficultyPrompts[profile.age_category] || difficultyPrompts.adultos}
+        prompt: `Gere UMA pergunta bíblica para ${
+          difficultyPrompts[profile.age_category] || difficultyPrompts.adultos
+        }
 
-Dificuldade requerida: ${difficultyLevel} (baseado em ${recentAccuracy.toFixed(0)}% de acertos recentes)
+Dificuldade requerida: ${difficultyLevel} (baseado em ${recentAccuracy.toFixed(
+          0,
+        )}% de acertos recentes)
 
 A pergunta deve ser:
 - Baseada na Bíblia evangélica pentecostal
 - Com 3 respostas erradas plausíveis
 - Com referência bíblica precisa
-- ${difficultyLevel === "muito difícil" ? "Extremamente específica e desafiadora" : difficultyLevel === "difícil" ? "Desafiadora com detalhes" : difficultyLevel === "média" ? "Balanceada" : "Fundamental e clara"}`,
+- ${
+          difficultyLevel === "muito difícil"
+            ? "Extremamente específica e desafiadora"
+            : difficultyLevel === "difícil"
+            ? "Desafiadora com detalhes"
+            : difficultyLevel === "média"
+            ? "Balanceada"
+            : "Fundamental e clara"
+        }`,
       })
 
       nextQuestion = {
@@ -88,7 +118,7 @@ A pergunta deve ser:
         difficulty_level: profile.age_category,
       }
     } else {
-      // Get from database, excluding answered questions
+      // Perguntas do banco
       const { data: questions } = await supabase
         .from("questions")
         .select("*")
@@ -97,7 +127,6 @@ A pergunta deve ser:
         .limit(10)
 
       if (!questions || questions.length === 0) {
-        // Reset answered questions if all have been answered
         await supabase.from("answered_questions").delete().eq("user_id", user.id)
 
         const { data: freshQuestions } = await supabase
@@ -106,7 +135,10 @@ A pergunta deve ser:
           .eq("difficulty_level", profile.age_category)
           .limit(10)
 
-        nextQuestion = freshQuestions?.[Math.floor(Math.random() * (freshQuestions?.length || 1))]
+        nextQuestion =
+          freshQuestions?.[
+            Math.floor(Math.random() * (freshQuestions?.length || 1))
+          ]
       } else {
         nextQuestion = questions[Math.floor(Math.random() * questions.length)]
       }
@@ -117,7 +149,10 @@ A pergunta deve ser:
       question: nextQuestion,
     })
   } catch (error) {
-    console.error("[v0] Error getting next question:", error)
-    return NextResponse.json({ error: "Erro ao buscar próxima pergunta" }, { status: 500 })
+    console.error("[API] Error getting next question:", error)
+    return NextResponse.json(
+      { error: "Erro ao buscar próxima pergunta" },
+      { status: 500 },
+    )
   }
 }
