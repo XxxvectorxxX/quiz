@@ -15,6 +15,7 @@ export default function HomePage() {
           </h1>
           <Heart className="h-12 w-12 text-pink-500 animate-pulse" />
         </div>
+         <p className="text-2xl md:text-3xl font-bold text-purple-700 mb-4">ieadpe vitoria setor 4</p>
         <p className="text-2xl md:text-3xl font-bold text-purple-700 mb-4">Uma Aventura pela Bíblia!</p>
         <p className="text-xl text-purple-600 mb-10 max-w-3xl mx-auto text-pretty font-medium">
           Descubra histórias incríveis, aprenda sobre Jesus e seus ensinamentos, e divirta-se respondendo perguntas
