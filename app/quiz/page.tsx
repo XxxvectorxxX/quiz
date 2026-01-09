@@ -113,7 +113,7 @@ export default async function QuizPage() {
               </Button>
             </CardContent>
           </Card>
-
+          {/*
           <Card className="border-2 border-purple-200 hover:border-purple-400 transition-colors bg-gradient-to-br from-purple-50 to-blue-50">
             <CardHeader>
               <div className="flex items-center gap-2 mb-2">
@@ -128,7 +128,7 @@ export default async function QuizPage() {
               </Button>
             </CardContent>
           </Card>
-
+          */}
           <Card className="border-2 border-green-200 hover:border-green-400 transition-colors">
             <CardHeader>
               <CardTitle className="text-xl">Competições</CardTitle>
