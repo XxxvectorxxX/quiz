@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { Suspense, useState } from "react"
 
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -9,9 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useState } from "react"
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -94,5 +94,31 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-svh w-full items-center justify-center p-6 bg-gradient-to-br from-blue-50 via-white to-purple-50">
+          <div className="w-full max-w-sm">
+            <div className="flex flex-col gap-6">
+              <div className="text-center mb-4">
+                <h1 className="text-4xl font-bold text-blue-600 mb-2">Quiz Bíblico</h1>
+                <p className="text-muted-foreground">Carregando...</p>
+              </div>
+              <Card>
+                <CardContent className="py-8">
+                  <p className="text-center text-muted-foreground">Carregando...</p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   )
 }
