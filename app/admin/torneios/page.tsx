@@ -1,14 +1,13 @@
-'use client';
-
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Trophy, Plus, Users, Trash2, Play, Eye } from "lucide-react"
+import { ArrowLeft, Trophy, Plus, Users, Trash2, Eye } from "lucide-react"
 import Link from "next/link"
 import { revalidatePath } from "next/cache"
 
+// Server Component - DO NOT add 'use client'
 export default async function AdminTorneiosPage() {
   const supabase = await createClient()
 
@@ -40,17 +39,12 @@ export default async function AdminTorneiosPage() {
 
   async function deleteTournament(formData: FormData) {
     "use server"
-    const supabase = await createClient()
+    const supabaseServer = await createClient()
     const tournamentId = formData.get("tournament_id") as string
 
-    // Delete tournament matches
-    await supabase.from("tournament_matches").delete().eq("tournament_id", tournamentId)
-
-    // Delete tournament participants
-    await supabase.from("tournament_participants").delete().eq("tournament_id", tournamentId)
-
-    // Delete tournament
-    await supabase.from("tournaments").delete().eq("id", tournamentId)
+    await supabaseServer.from("tournament_matches").delete().eq("tournament_id", tournamentId)
+    await supabaseServer.from("tournament_participants").delete().eq("tournament_id", tournamentId)
+    await supabaseServer.from("tournaments").delete().eq("id", tournamentId)
 
     revalidatePath("/admin/torneios")
   }
@@ -143,16 +137,7 @@ export default async function AdminTorneiosPage() {
                           </Button>
                           <form action={deleteTournament}>
                             <input type="hidden" name="tournament_id" value={tournament.id} />
-                            <Button
-                              type="submit"
-                              variant="destructive"
-                              size="sm"
-                              onClick={(e) => {
-                                if (!confirm(`Deseja realmente excluir o torneio "${tournament.name}"?`)) {
-                                  e.preventDefault()
-                                }
-                              }}
-                            >
+                            <Button type="submit" variant="destructive" size="sm">
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </form>
