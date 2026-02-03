@@ -45,7 +45,7 @@ export default async function AdminUsuariosPage() {
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Voltar
               </Link>
-            </Link>
+            </Button>
             <h1 className="text-2xl font-bold text-slate-900">Gerenciar Usuários</h1>
           </div>
         </div>
