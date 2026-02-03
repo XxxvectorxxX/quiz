@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Settings, Users, BookOpen, Trophy, ScrollText, Home, X, Menu, Sparkles } from "lucide-react"
+import { Settings, Users, BookOpen, Trophy, ScrollText, Home, X, Menu, Sparkles, Medal, Church } from "lucide-react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { usePathname } from "next/navigation"
@@ -77,7 +77,19 @@ export function AdminNav() {
                   <Button variant="ghost" size="sm" className="w-full justify-start" asChild>
                     <Link href="/competicoes">
                       <Trophy className="h-4 w-4 mr-2" />
-                      Competições
+                      Competicoes
+                    </Link>
+                  </Button>
+                  <Button variant="ghost" size="sm" className="w-full justify-start" asChild>
+                    <Link href="/torneios">
+                      <Medal className="h-4 w-4 mr-2" />
+                      Torneios
+                    </Link>
+                  </Button>
+                  <Button variant="ghost" size="sm" className="w-full justify-start" asChild>
+                    <Link href="/igrejas">
+                      <Church className="h-4 w-4 mr-2" />
+                      Igrejas
                     </Link>
                   </Button>
                   <Button variant="ghost" size="sm" className="w-full justify-start" asChild>
@@ -147,6 +159,17 @@ export function AdminNav() {
                     </Link>
                   </Button>
                   <Button
+                    variant={pathname === "/admin/torneios" ? "default" : "ghost"}
+                    size="sm"
+                    className="w-full justify-start"
+                    asChild
+                  >
+                    <Link href="/admin/torneios">
+                      <Medal className="h-4 w-4 mr-2" />
+                      Torneios
+                    </Link>
+                  </Button>
+                  <Button
                     variant={pathname === "/admin/logs" ? "default" : "ghost"}
                     size="sm"
                     className="w-full justify-start"
@@ -177,3 +200,4 @@ export function AdminNav() {
     </>
   )
 }
+

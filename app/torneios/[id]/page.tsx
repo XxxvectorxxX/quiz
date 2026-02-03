@@ -2,11 +2,12 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Trophy, Users, ArrowRight, Crown } from "lucide-react"
+import { Trophy, Users, Crown } from "lucide-react"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle, ItemGroup } from "@/components/ui/item"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { TournamentBracket } from "@/components/tournament-bracket"
 
 export default async function TorneioDetalhePage({ params }: { params: { id: string } }) {
   const supabase = await createClient()
@@ -131,25 +132,6 @@ export default async function TorneioDetalhePage({ params }: { params: { id: str
     await supabase.rpc("generate_tournament_bracket", { tournament_uuid: params.id })
 
     redirect(`/torneios/${params.id}`)
-  }
-
-  // Group matches by round
-  const matchesByRound: Record<number, any[]> = {}
-  matches?.forEach((match: any) => {
-    if (!matchesByRound[match.round_number]) {
-      matchesByRound[match.round_number] = []
-    }
-    matchesByRound[match.round_number].push(match)
-  })
-
-  const totalRounds = matches && matches.length > 0 ? Math.max(...matches.map((m: any) => m.round_number)) : 0
-
-  const getRoundName = (round: number, total: number) => {
-    if (round === total) return "Final"
-    if (round === total - 1) return "Semifinal"
-    if (round === total - 2) return "Quartas de Final"
-    if (round === total - 3) return "Oitavas de Final"
-    return `Rodada ${round}`
   }
 
   return (
@@ -304,115 +286,28 @@ export default async function TorneioDetalhePage({ params }: { params: { id: str
 
         {/* Tournament Bracket */}
         {(tournament.status === "in_progress" || tournament.status === "completed") && (
-          <div className="space-y-8">
-            <h2 className="text-2xl font-bold flex items-center gap-2">
-              <Trophy className="h-6 w-6 text-purple-600" />
-              Chaveamento
-            </h2>
-
-            {Object.keys(matchesByRound).length === 0 ? (
-              <Card>
-                <CardContent className="py-12">
-                  <Empty>
-                    <EmptyHeader>
-                      <EmptyMedia>
-                        <Trophy className="h-12 w-12" />
-                      </EmptyMedia>
-                      <EmptyTitle>Gerando chaveamento...</EmptyTitle>
-                      <EmptyDescription>As partidas estão sendo criadas</EmptyDescription>
-                    </EmptyHeader>
-                  </Empty>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-8">
-                {Object.entries(matchesByRound)
-                  .sort(([a], [b]) => Number.parseInt(a) - Number.parseInt(b))
-                  .map(([round, roundMatches]) => (
-                    <Card key={round} className="border-2">
-                      <CardHeader>
-                        <CardTitle className="text-xl">{getRoundName(Number.parseInt(round), totalRounds)}</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid md:grid-cols-2 gap-4">
-                          {roundMatches.map((match: any) => (
-                            <Card key={match.id} className="border">
-                              <CardContent className="p-4">
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="text-xs text-muted-foreground">Partida {match.match_number}</span>
-                                  <Badge
-                                    variant={match.status === "completed" ? "outline" : "default"}
-                                    className="text-xs"
-                                  >
-                                    {match.status === "pending" && "Aguardando"}
-                                    {match.status === "in_progress" && "Em Jogo"}
-                                    {match.status === "completed" && "Finalizada"}
-                                  </Badge>
-                                </div>
-
-                                <div className="space-y-3">
-                                  {/* Team 1 */}
-                                  <div
-                                    className={`flex items-center justify-between p-3 rounded-lg ${
-                                      match.winner_team_id === match.team1_id
-                                        ? "bg-green-100 border-2 border-green-400"
-                                        : "bg-muted"
-                                    }`}
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      <div
-                                        className="h-8 w-8 rounded-full"
-                                        style={{ backgroundColor: match.team1?.color || "#ccc" }}
-                                      />
-                                      <span className="font-medium">{match.team1?.name || "A definir"}</span>
-                                    </div>
-                                    {match.status === "completed" && (
-                                      <span className="text-lg font-bold">{match.team1_score}</span>
-                                    )}
-                                  </div>
-
-                                  <div className="flex justify-center">
-                                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                                  </div>
-
-                                  {/* Team 2 */}
-                                  <div
-                                    className={`flex items-center justify-between p-3 rounded-lg ${
-                                      match.winner_team_id === match.team2_id
-                                        ? "bg-green-100 border-2 border-green-400"
-                                        : "bg-muted"
-                                    }`}
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      <div
-                                        className="h-8 w-8 rounded-full"
-                                        style={{ backgroundColor: match.team2?.color || "#ccc" }}
-                                      />
-                                      <span className="font-medium">{match.team2?.name || "A definir"}</span>
-                                    </div>
-                                    {match.status === "completed" && (
-                                      <span className="text-lg font-bold">{match.team2_score}</span>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {isAdmin && match.status === "pending" && match.team1_id && match.team2_id && (
-                                  <Button className="w-full mt-3" size="sm" asChild>
-                                    <Link href={`/torneios/${params.id}/partida/${match.id}`}>Iniciar Partida</Link>
-                                  </Button>
-                                )}
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-              </div>
-            )}
-          </div>
+          <Card className="border-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-2xl">
+                <Trophy className="h-6 w-6 text-purple-600" />
+                Chaveamento do Torneio
+              </CardTitle>
+              <CardDescription>
+                Acompanhe todas as partidas e o avanco das equipes ate a final
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <TournamentBracket
+                matches={matches || []}
+                tournamentId={params.id}
+                isAdmin={isAdmin}
+                status={tournament.status}
+              />
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>
   )
 }
+
