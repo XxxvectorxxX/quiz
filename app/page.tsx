@@ -1,9 +1,62 @@
+"use client"
+
+import React from "react"
+
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { BookOpen, Users, Trophy, Zap, Star, Heart, Sparkles } from "lucide-react"
+import { BookOpen, Users, Trophy, Zap, Star, Heart, Sparkles, Ticket, Church } from "lucide-react"
 import Link from "next/link"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
 
 export default function HomePage() {
+  const [inviteCode, setInviteCode] = useState("")
+  const [isSearching, setIsSearching] = useState(false)
+  const [error, setError] = useState("")
+  const router = useRouter()
+  const supabase = createClient()
+
+  const handleJoinTournament = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSearching(true)
+    setError("")
+
+    try {
+      const { data: tournament } = await supabase
+        .from("tournaments")
+        .select("id, name, status")
+        .eq("invite_code", inviteCode.toUpperCase())
+        .single()
+
+      if (!tournament) {
+        setError("Torneio não encontrado. Verifique o código.")
+        return
+      }
+
+      if (tournament.status !== "registration") {
+        setError("Este torneio não está aceitando inscrições.")
+        return
+      }
+
+      router.push(`/torneios/${tournament.id}`)
+    } catch {
+      setError("Torneio não encontrado. Verifique o código.")
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
   return (
     <div className="min-h-svh kid-friendly-bg">
       {/* Hero Section */}
@@ -15,13 +68,12 @@ export default function HomePage() {
           </h1>
           <Heart className="h-12 w-12 text-pink-500 animate-pulse" />
         </div>
-         <p className="text-6xl md:text-7xl font-black bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 bg-clip-text text-transparent text-balance">IEADPE Vitoria Setor 4</p>
         <p className="text-2xl md:text-3xl font-bold text-purple-700 mb-4">Uma Aventura pela Bíblia!</p>
         <p className="text-xl text-purple-600 mb-10 max-w-3xl mx-auto text-pretty font-medium">
           Descubra histórias incríveis, aprenda sobre Jesus e seus ensinamentos, e divirta-se respondendo perguntas
           bíblicas com seus amigos!
         </p>
-        <div className="flex flex-col sm:flex-row gap-6 justify-center">
+        <div className="flex flex-col sm:flex-row gap-6 justify-center flex-wrap">
           <Button
             size="lg"
             asChild
@@ -40,6 +92,48 @@ export default function HomePage() {
           >
             <Link href="/auth/login">Já tenho conta 😊</Link>
           </Button>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button
+                size="lg"
+                variant="outline"
+                className="kid-button border-4 border-orange-400 text-orange-700 hover:bg-orange-100 bg-transparent"
+              >
+                <Ticket className="h-6 w-6 mr-2" />
+                Entrar em Torneio
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="kid-card">
+              <DialogHeader>
+                <DialogTitle className="text-2xl text-purple-700">Entrar em Torneio</DialogTitle>
+                <DialogDescription>Digite o código de convite do torneio para participar</DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleJoinTournament} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="inviteCode" className="text-lg font-bold text-purple-600">
+                    Código do Torneio
+                  </Label>
+                  <Input
+                    id="inviteCode"
+                    placeholder="Ex: ABC12345"
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                    className="text-center text-2xl font-mono tracking-widest h-14 border-2 border-purple-300"
+                    maxLength={8}
+                    required
+                  />
+                </div>
+                {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+                <Button
+                  type="submit"
+                  disabled={isSearching || inviteCode.length < 6}
+                  className="w-full kid-button bg-gradient-to-r from-orange-500 to-pink-500"
+                >
+                  {isSearching ? "Buscando..." : "Entrar no Torneio"}
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
       </section>
 
@@ -127,3 +221,4 @@ export default function HomePage() {
     </div>
   )
 }
+
