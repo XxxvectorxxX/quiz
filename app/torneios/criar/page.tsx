@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Link from "next/link"
 
 export default async function CriarTorneioPage() {
@@ -66,33 +65,35 @@ export default async function CriarTorneioPage() {
 
             <div className="space-y-2">
               <Label htmlFor="competition_mode">Modo de Competição</Label>
-              <Select name="competition_mode" required>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o modo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1v1">1 vs 1</SelectItem>
-                  <SelectItem value="2v2">2 vs 2</SelectItem>
-                  <SelectItem value="3v3">3 vs 3</SelectItem>
-                  <SelectItem value="4v4">4 vs 4</SelectItem>
-                  <SelectItem value="5v5">5 vs 5</SelectItem>
-                </SelectContent>
-              </Select>
+              <select
+                id="competition_mode"
+                name="competition_mode"
+                required
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Selecione o modo</option>
+                <option value="1v1">1 vs 1</option>
+                <option value="2v2">2 vs 2</option>
+                <option value="3v3">3 vs 3</option>
+                <option value="4v4">4 vs 4</option>
+                <option value="5v5">5 vs 5</option>
+              </select>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="max_teams">Número Máximo de Equipes</Label>
-              <Select name="max_teams" required>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a quantidade" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="4">4 equipes (Semifinal)</SelectItem>
-                  <SelectItem value="8">8 equipes (Quartas)</SelectItem>
-                  <SelectItem value="16">16 equipes (Oitavas)</SelectItem>
-                  <SelectItem value="32">32 equipes</SelectItem>
-                </SelectContent>
-              </Select>
+              <select
+                id="max_teams"
+                name="max_teams"
+                required
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Selecione a quantidade</option>
+                <option value="4">4 equipes (Semifinal)</option>
+                <option value="8">8 equipes (Quartas)</option>
+                <option value="16">16 equipes (Oitavas)</option>
+                <option value="32">32 equipes</option>
+              </select>
             </div>
 
             <div className="flex gap-2 pt-4">

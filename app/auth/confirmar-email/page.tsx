@@ -1,5 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { CheckCircle } from "lucide-react"
+import Link from "next/link"
 
 export default function ConfirmarEmailPage() {
   return (
@@ -14,11 +16,19 @@ export default function ConfirmarEmailPage() {
               <CardTitle className="text-2xl">Cadastro realizado!</CardTitle>
               <CardDescription>Confirme seu email para continuar</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground text-center">
                 Enviamos um email de confirmação para você. Por favor, verifique sua caixa de entrada e clique no link
                 para ativar sua conta.
               </p>
+              <div className="flex flex-col gap-2 pt-2">
+                <Button asChild className="w-full">
+                  <Link href="/auth/login">Ir para Entrar</Link>
+                </Button>
+                <Button variant="outline" asChild className="w-full">
+                  <Link href="/">Voltar ao Início</Link>
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>

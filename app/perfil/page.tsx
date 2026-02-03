@@ -201,8 +201,9 @@ export default function PerfilPage() {
             {recentSessions.length > 0 ? (
               <div className="space-y-3">
                 {recentSessions.map((session: any) => {
-                  const totalQuestions = session.questions.length
-                  const percentage = Math.round((session.score / totalQuestions) * 100)
+                  const answersArray = Array.isArray(session.answers) ? session.answers : []
+                  const totalQuestions = answersArray.length || session.questions?.length || 1
+                  const percentage = totalQuestions > 0 ? Math.round((session.score / totalQuestions) * 100) : 0
 
                   return (
                     <div key={session.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">

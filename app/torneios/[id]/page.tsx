@@ -2,28 +2,31 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Trophy, Users, Crown } from "lucide-react"
+import { Trophy, Users, Crown, Share2 } from "lucide-react"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle, ItemGroup } from "@/components/ui/item"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { TournamentBracket } from "@/components/tournament-bracket"
 
-export default async function TorneioDetalhePage({ params }: { params: { id: string } }) {
+interface PageProps {
+  params: Promise<{ id: string }>
+}
+
+export default async function TorneioDetalhePage({ params }: PageProps) {
+  const { id: tournamentId } = await params
   const supabase = await createClient()
 
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (!user) {
-    redirect("/auth/login")
-  }
 
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
+  const profile = user
+    ? (await supabase.from("profiles").select("*").eq("id", user.id).single()).data
+    : null
 
-  if (!profile) {
-    redirect("/auth/login")
-  }
+  const isLoggedIn = !!user && !!profile
+  const isAdmin = profile?.is_admin ?? false
 
   // Get tournament details
   const { data: tournament } = await supabase
@@ -38,7 +41,7 @@ export default async function TorneioDetalhePage({ params }: { params: { id: str
       )
     `,
     )
-    .eq("id", params.id)
+    .eq("id", tournamentId)
     .single()
 
   if (!tournament) {
@@ -59,7 +62,7 @@ export default async function TorneioDetalhePage({ params }: { params: { id: str
       )
     `,
     )
-    .eq("tournament_id", params.id)
+    .eq("tournament_id", tournamentId)
     .order("seed")
 
   // Get matches
@@ -85,67 +88,80 @@ export default async function TorneioDetalhePage({ params }: { params: { id: str
       )
     `,
     )
-    .eq("tournament_id", params.id)
+    .eq("tournament_id", tournamentId)
     .order("round_number")
     .order("match_number")
 
-  const isAdmin = profile.is_admin
-
-  // Check if user's team is participating
-  const userTeams = await supabase.from("teams").select("id").eq("leader_id", user.id)
+  // Check if user's team is participating and get user teams with names (apenas quando logado)
+  const { data: userTeamsData } = await supabase
+    .from("teams")
+    .select("id, name")
+    .eq("leader_id", user?.id ?? "")
+  const participantTeamIds = new Set((participants || []).map((p: any) => p.team_id))
+  const availableTeams = (userTeamsData || []).filter((t) => !participantTeamIds.has(t.id))
 
   const canJoin =
+    isLoggedIn &&
     tournament.status === "registration" &&
     participants &&
     participants.length < tournament.max_teams &&
-    userTeams.data &&
-    userTeams.data.length > 0 &&
-    !participants.some((p: any) => userTeams.data.some((ut) => ut.id === p.team_id))
+    availableTeams.length > 0
 
   async function joinTournament(formData: FormData) {
     "use server"
     const supabase = await createClient()
     const teamId = formData.get("team_id") as string
+    const tid = formData.get("tournament_id") as string
+    if (!tid || !teamId) return
 
-    // Get current participant count
     const { count } = await supabase
       .from("tournament_participants")
       .select("*", { count: "exact", head: true })
-      .eq("tournament_id", params.id)
+      .eq("tournament_id", tid)
 
     const seed = (count || 0) + 1
 
     await supabase.from("tournament_participants").insert({
-      tournament_id: params.id,
+      tournament_id: tid,
       team_id: teamId,
       seed,
     })
 
-    redirect(`/torneios/${params.id}`)
+    redirect(`/torneios/${tid}`)
   }
 
-  async function startTournament() {
+  async function startTournament(formData: FormData) {
     "use server"
     const supabase = await createClient()
+    const tid = formData.get("tournament_id") as string
+    if (!tid) return
 
-    // Call function to generate bracket
-    await supabase.rpc("generate_tournament_bracket", { tournament_uuid: params.id })
-
-    redirect(`/torneios/${params.id}`)
+    await supabase.rpc("generate_tournament_bracket", { tournament_uuid: tid })
+    redirect(`/torneios/${tid}`)
   }
 
   return (
     <div className="min-h-svh bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
       <header className="border-b bg-white/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+        <div className="container mx-auto px-4 py-4 flex flex-wrap justify-between items-center gap-3">
           <Link href="/quiz">
             <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
               Quiz Bíblico
             </h1>
           </Link>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/torneios">Voltar</Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            {(tournament.status === "in_progress" || tournament.status === "completed") && (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/torneios/${tournamentId}/chave`}>
+                  <Share2 className="h-4 w-4 mr-2" />
+                  Ver chave
+                </Link>
+              </Button>
+            )}
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/torneios">Voltar</Link>
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -234,27 +250,41 @@ export default async function TorneioDetalhePage({ params }: { params: { id: str
               </CardContent>
             </Card>
 
-            {/* Join Tournament */}
+            {/* Join Tournament ou CTA para quem está de fora */}
             <Card>
               <CardHeader>
                 <CardTitle>Inscrever Equipe</CardTitle>
-                <CardDescription>Escolha uma equipe para participar do torneio</CardDescription>
+                <CardDescription>
+                  {isLoggedIn
+                    ? "Escolha uma equipe para participar do torneio"
+                    : "Faça login para inscrever sua equipe neste torneio"}
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                {canJoin ? (
+                {!isLoggedIn ? (
+                  <div className="space-y-4 text-center py-4">
+                    <p className="text-muted-foreground">
+                      Você está visualizando este torneio. Entre na sua conta para inscrever uma equipe.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                      <Button asChild className="w-full sm:w-auto">
+                        <Link href={`/auth/login?redirect=/torneios/${tournamentId}`}>Entrar</Link>
+                      </Button>
+                      <Button variant="outline" asChild className="w-full sm:w-auto">
+                        <Link href={`/auth/cadastro?redirect=/torneios/${tournamentId}`}>Criar conta</Link>
+                      </Button>
+                    </div>
+                  </div>
+                ) : canJoin ? (
                   <form action={joinTournament} className="space-y-4">
+                    <input type="hidden" name="tournament_id" value={tournamentId} />
                     <select name="team_id" className="w-full p-3 rounded-lg border bg-white" required>
                       <option value="">Selecione uma equipe...</option>
-                      {userTeams.data
-                        ?.filter((ut) => !participants?.some((p: any) => p.team_id === ut.id))
-                        .map(async (team) => {
-                          const { data: teamData } = await supabase.from("teams").select("*").eq("id", team.id).single()
-                          return (
-                            <option key={team.id} value={team.id}>
-                              {teamData?.name}
-                            </option>
-                          )
-                        })}
+                      {availableTeams.map((team) => (
+                        <option key={team.id} value={team.id}>
+                          {team.name}
+                        </option>
+                      ))}
                     </select>
                     <Button type="submit" className="w-full">
                       Inscrever Equipe
@@ -272,8 +302,9 @@ export default async function TorneioDetalhePage({ params }: { params: { id: str
                   </div>
                 )}
 
-                {isAdmin && tournament.status === "registration" && participants && participants.length >= 2 && (
+                {isLoggedIn && isAdmin && tournament.status === "registration" && participants && participants.length >= 2 && (
                   <form action={startTournament} className="mt-4">
+                    <input type="hidden" name="tournament_id" value={tournamentId} />
                     <Button type="submit" variant="default" className="w-full">
                       Iniciar Torneio
                     </Button>
@@ -299,7 +330,7 @@ export default async function TorneioDetalhePage({ params }: { params: { id: str
             <CardContent>
               <TournamentBracket
                 matches={matches || []}
-                tournamentId={params.id}
+                tournamentId={tournamentId}
                 isAdmin={isAdmin}
                 status={tournament.status}
               />

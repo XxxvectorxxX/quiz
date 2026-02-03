@@ -27,9 +27,10 @@ export default async function ResultadoPage({ params }: PageProps) {
     redirect("/quiz")
   }
 
-  const score = session.score || 0
-  const totalQuestions = session.questions.length
-  const percentage = Math.round((score / totalQuestions) * 100)
+  const score = session.score ?? 0
+  const answersArray = Array.isArray(session.answers) ? session.answers : []
+  const totalQuestions = answersArray.length > 0 ? answersArray.length : (session.questions?.length ?? 0) || 1
+  const percentage = totalQuestions > 0 ? Math.round((score / totalQuestions) * 100) : 0
 
   const getPerformanceMessage = (percentage: number) => {
     if (percentage >= 90) return { title: "Excelente!", message: "Você domina a Palavra!", color: "text-green-600" }
