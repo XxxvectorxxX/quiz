@@ -15,26 +15,21 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Trash2 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 
 interface DeleteTournamentButtonProps {
   tournamentId: string
   tournamentName: string
+  deleteAction: (tournamentId: string) => Promise<void>
 }
 
-export function DeleteTournamentButton({ tournamentId, tournamentName }: DeleteTournamentButtonProps) {
+export function DeleteTournamentButton({ tournamentId, tournamentName, deleteAction }: DeleteTournamentButtonProps) {
   const [open, setOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const router = useRouter()
 
   async function handleDelete() {
     setIsDeleting(true)
-    const supabase = createClient()
-
-    await supabase.from("tournament_matches").delete().eq("tournament_id", tournamentId)
-    await supabase.from("tournament_participants").delete().eq("tournament_id", tournamentId)
-    await supabase.from("tournaments").delete().eq("id", tournamentId)
-
+    await deleteAction(tournamentId)
     setOpen(false)
     router.refresh()
     setIsDeleting(false)

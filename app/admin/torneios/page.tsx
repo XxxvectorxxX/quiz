@@ -5,7 +5,26 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Trophy, Plus, Users, Eye } from "lucide-react"
 import Link from "next/link"
+import { revalidatePath } from "next/cache"
 import { DeleteTournamentButton } from "@/components/DeleteTournamentButton"
+
+async function deleteTournamentAction(tournamentId: string) {
+  "use server"
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single()
+  if (!profile?.is_admin) return
+
+  await supabase.from("tournament_matches").delete().eq("tournament_id", tournamentId)
+  await supabase.from("tournament_participants").delete().eq("tournament_id", tournamentId)
+  await supabase.from("tournaments").delete().eq("id", tournamentId)
+
+  revalidatePath("/admin/torneios")
+  revalidatePath("/torneios")
+}
 
 // Server Component - DO NOT add 'use client'
 export default async function AdminTorneiosPage() {
@@ -126,6 +145,7 @@ export default async function AdminTorneiosPage() {
                           <DeleteTournamentButton
                             tournamentId={tournament.id}
                             tournamentName={tournament.name}
+                            deleteAction={deleteTournamentAction}
                           />
                         </div>
                       </div>
