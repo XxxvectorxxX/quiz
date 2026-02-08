@@ -3,9 +3,9 @@ import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Trophy, Plus, Users, Trash2, Eye } from "lucide-react"
+import { ArrowLeft, Trophy, Plus, Users, Eye } from "lucide-react"
 import Link from "next/link"
-import { revalidatePath } from "next/cache"
+import { DeleteTournamentButton } from "@/components/DeleteTournamentButton"
 
 // Server Component - DO NOT add 'use client'
 export default async function AdminTorneiosPage() {
@@ -36,18 +36,6 @@ export default async function AdminTorneiosPage() {
       )
     `)
     .order("created_at", { ascending: false })
-
-  async function deleteTournament(formData: FormData) {
-    "use server"
-    const supabaseServer = await createClient()
-    const tournamentId = formData.get("tournament_id") as string
-
-    await supabaseServer.from("tournament_matches").delete().eq("tournament_id", tournamentId)
-    await supabaseServer.from("tournament_participants").delete().eq("tournament_id", tournamentId)
-    await supabaseServer.from("tournaments").delete().eq("id", tournamentId)
-
-    revalidatePath("/admin/torneios")
-  }
 
   const statusMap: Record<string, { label: string; color: string }> = {
     registration: { label: "Inscricoes Abertas", color: "bg-green-100 text-green-800" },
@@ -135,12 +123,10 @@ export default async function AdminTorneiosPage() {
                               Ver
                             </Link>
                           </Button>
-                          <form action={deleteTournament}>
-                            <input type="hidden" name="tournament_id" value={tournament.id} />
-                            <Button type="submit" variant="destructive" size="sm">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </form>
+                          <DeleteTournamentButton
+                            tournamentId={tournament.id}
+                            tournamentName={tournament.name}
+                          />
                         </div>
                       </div>
                     )
