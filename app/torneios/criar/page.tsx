@@ -35,6 +35,7 @@ export default async function CriarTorneioPage() {
     const name = formData.get("name") as string
     const competitionMode = formData.get("competition_mode") as string
     const maxTeams = Number.parseInt(formData.get("max_teams") as string)
+    const questionTimeSeconds = Number.parseInt((formData.get("question_time_seconds") as string) || "15")
 
     const { data, error } = await supabase
       .from("tournaments")
@@ -42,6 +43,7 @@ export default async function CriarTorneioPage() {
         name,
         competition_mode: competitionMode,
         max_teams: maxTeams,
+        question_time_seconds: Math.min(30, Math.max(10, questionTimeSeconds)),
         invite_code: inviteCode,
         created_by: user.id,
       })
@@ -84,6 +86,21 @@ export default async function CriarTorneioPage() {
                 <option value="3v3">3 vs 3</option>
                 <option value="4v4">4 vs 4</option>
                 <option value="5v5">5 vs 5</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="question_time_seconds">Tempo por Pergunta (segundos)</Label>
+              <select
+                id="question_time_seconds"
+                name="question_time_seconds"
+                required
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="10">10 segundos</option>
+                <option value="15">15 segundos</option>
+                <option value="20">20 segundos</option>
+                <option value="30">30 segundos</option>
               </select>
             </div>
 

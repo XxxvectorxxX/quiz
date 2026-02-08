@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Trophy, Share2, ArrowLeft, Crown } from "lucide-react"
 import Link from "next/link"
-import { TournamentBracket } from "@/components/tournament-bracket"
+import { LiveTournamentBracket } from "@/components/LiveTournamentBracket"
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -132,10 +132,9 @@ export default async function ChaveTorneioPage({ params }: PageProps) {
         {/* Chave em tela cheia - modo somente visualização (não admin) */}
         <Card className="border-2 overflow-hidden">
           <CardContent className="p-4 md:p-6">
-            <TournamentBracket
-              matches={matches || []}
+            <LiveTournamentBracket
               tournamentId={tournamentId}
-              isAdmin={false}
+              initialMatches={matches || []}
               status={tournament.status}
             />
           </CardContent>
