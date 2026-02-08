@@ -32,29 +32,54 @@ interface TournamentBracketProps {
   status: string
 }
 
+const MATCH_HEIGHT = 180
+const ROUND_GAP = 48
+const CARD_WIDTH = 256
+
+/**
+ * Organiza as partidas em estrutura de árvore para o chaveamento.
+ * Cada rodada tem 2^(totalRounds - round) partidas.
+ * As partidas são ordenadas por match_number para manter o fluxo correto.
+ */
+function buildBracketTree(matches: Match[]) {
+  const byRound: Record<number, Match[]> = {}
+  matches.forEach((m) => {
+    if (!byRound[m.round_number]) byRound[m.round_number] = []
+    byRound[m.round_number].push(m)
+  })
+
+  const rounds = Object.keys(byRound)
+    .map(Number)
+    .sort((a, b) => a - b)
+
+  rounds.forEach((r) => {
+    byRound[r].sort((a, b) => a.match_number - b.match_number)
+  })
+
+  return { byRound, rounds, totalRounds: rounds.length }
+}
+
+/**
+ * Calcula a posição vertical de cada partida no chaveamento (em "slots").
+ * Slots garantem alinhamento: vencedor de M1 e M2 alimenta a partida central entre eles.
+ */
+function getMatchSlot(round: number, matchIndex: number, totalRounds: number) {
+  const matchesInRound = Math.pow(2, totalRounds - round)
+  const slotsPerMatch = Math.pow(2, round - 1)
+  return matchIndex * slotsPerMatch + (slotsPerMatch - 1) / 2
+}
+
 export function TournamentBracket({ matches, tournamentId, isAdmin, status }: TournamentBracketProps) {
   if (!matches || matches.length === 0) {
     return (
       <div className="text-center py-12">
         <Trophy className="h-16 w-16 mx-auto text-purple-300 mb-4" />
-        <p className="text-lg text-muted-foreground">Aguardando inicio do torneio...</p>
+        <p className="text-lg text-muted-foreground">Aguardando início do torneio...</p>
       </div>
     )
   }
 
-  // Group matches by round
-  const matchesByRound: Record<number, Match[]> = {}
-  matches.forEach((match) => {
-    if (!matchesByRound[match.round_number]) {
-      matchesByRound[match.round_number] = []
-    }
-    matchesByRound[match.round_number].push(match)
-  })
-
-  const rounds = Object.keys(matchesByRound)
-    .map(Number)
-    .sort((a, b) => a - b)
-  const totalRounds = rounds.length
+  const { byRound, rounds, totalRounds } = buildBracketTree(matches)
 
   const getRoundName = (round: number) => {
     const fromEnd = totalRounds - round + 1
@@ -65,9 +90,11 @@ export function TournamentBracket({ matches, tournamentId, isAdmin, status }: To
     return `Rodada ${round}`
   }
 
-  // Find champion
   const finalMatch = matches.find((m) => m.round_number === totalRounds && m.status === "completed")
   const champion = finalMatch?.winner
+
+  const totalSlots = Math.pow(2, totalRounds - 1)
+  const slotHeight = MATCH_HEIGHT + 16
 
   return (
     <div className="space-y-8">
@@ -77,7 +104,7 @@ export function TournamentBracket({ matches, tournamentId, isAdmin, status }: To
           <div className="flex items-center justify-center gap-4">
             <Crown className="h-12 w-12 text-yellow-900" />
             <div className="text-center">
-              <p className="text-yellow-900 font-medium text-sm uppercase tracking-wider">Campeao</p>
+              <p className="text-yellow-900 font-medium text-sm uppercase tracking-wider">Campeão</p>
               <h2 className="text-3xl font-black text-yellow-900">{champion.name}</h2>
             </div>
             <Crown className="h-12 w-12 text-yellow-900" />
@@ -85,45 +112,87 @@ export function TournamentBracket({ matches, tournamentId, isAdmin, status }: To
         </div>
       )}
 
-      {/* Bracket Visualization */}
-      <div className="overflow-x-auto pb-4">
-        <div className="flex gap-4 min-w-max">
+      {/* Bracket Tree Visualization */}
+      <div className="overflow-x-auto overflow-y-auto pb-4 relative">
+        <div
+          className="relative flex gap-0 min-w-max"
+          style={{
+            minHeight: totalSlots * slotHeight + 48,
+          }}
+        >
           {rounds.map((round) => {
-            const roundMatches = matchesByRound[round] || []
-            const roundName = getRoundName(round)
+            const roundMatches = byRound[round] || []
             const isFinal = round === totalRounds
 
             return (
-              <div key={round} className="flex flex-col">
+              <div
+                key={round}
+                className="flex flex-col shrink-0"
+                style={{
+                  width: CARD_WIDTH + ROUND_GAP,
+                  minHeight: totalSlots * slotHeight,
+                }}
+              >
                 {/* Round Header */}
                 <div
-                  className={`text-center mb-4 px-4 py-2 rounded-full font-bold ${isFinal
-                    ? "bg-gradient-to-r from-yellow-400 to-orange-400 text-yellow-900"
-                    : "bg-purple-100 text-purple-700"
-                    }`}
+                  className={`text-center mb-2 px-4 py-2 rounded-full font-bold shrink-0 ${
+                    isFinal
+                      ? "bg-gradient-to-r from-yellow-400 to-orange-400 text-yellow-900"
+                      : "bg-purple-100 text-purple-700"
+                  }`}
                 >
-                  {roundName}
+                  {getRoundName(round)}
                 </div>
 
-                {/* Matches */}
+                {/* Matches - posicionados com espaçamento de árvore */}
                 <div
-                  className="flex flex-col justify-around flex-1 gap-4"
-                  style={{ minHeight: `${roundMatches.length * 180}px` }}
+                  className="relative flex flex-col flex-1"
+                  style={{
+                    minHeight: totalSlots * slotHeight - 48,
+                    gap: 16,
+                  }}
                 >
-                  {roundMatches.map((match) => (
-                    <MatchCard
-                      key={match.id}
-                      match={match}
-                      tournamentId={tournamentId}
-                      isAdmin={isAdmin}
-                      isFinal={isFinal}
-                    />
-                  ))}
+                  {roundMatches.map((match, idx) => {
+                    const slot = getMatchSlot(round, idx, totalRounds)
+                    const top = slot * slotHeight
+
+                    return (
+                      <div
+                        key={match.id}
+                        className="absolute left-0 right-0 shrink-0 z-10"
+                        data-match-id={match.id}
+                        data-round={round}
+                        data-slot={slot}
+                        style={{
+                          top,
+                        }}
+                      >
+                        <MatchCard
+                          match={match}
+                          tournamentId={tournamentId}
+                          isAdmin={isAdmin}
+                          isFinal={isFinal}
+                        />
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )
           })}
         </div>
+
+        {/* Linhas conectando partidas - SVG overlay */}
+        <BracketConnectorLines
+          rounds={rounds}
+          byRound={byRound}
+          totalRounds={totalRounds}
+          totalSlots={totalSlots}
+          slotHeight={slotHeight}
+          roundWidth={CARD_WIDTH + ROUND_GAP}
+          cardWidth={CARD_WIDTH}
+          matchHeight={MATCH_HEIGHT}
+        />
       </div>
 
       {/* Legend */}
@@ -146,6 +215,74 @@ export function TournamentBracket({ matches, tournamentId, isAdmin, status }: To
         </div>
       </div>
     </div>
+  )
+}
+
+interface BracketConnectorLinesProps {
+  rounds: number[]
+  byRound: Record<number, Match[]>
+  totalRounds: number
+  totalSlots: number
+  slotHeight: number
+  roundWidth: number
+  cardWidth: number
+  matchHeight: number
+}
+
+function BracketConnectorLines({
+  rounds,
+  byRound,
+  totalRounds,
+  totalSlots,
+  slotHeight,
+  roundWidth,
+  cardWidth,
+  matchHeight,
+}: BracketConnectorLinesProps) {
+  const paths: string[] = []
+  const headerHeight = 48
+
+  for (let r = 0; r < rounds.length - 1; r++) {
+    const currRound = rounds[r]
+    const nextRound = rounds[r + 1]
+    const currMatches = byRound[currRound] || []
+
+    currMatches.forEach((_, idx) => {
+      const slot = getMatchSlot(currRound, idx, totalRounds)
+      const x1 = r * roundWidth + cardWidth
+      const y1 = headerHeight + slot * slotHeight + matchHeight / 2
+
+      const nextIdx = Math.floor(idx / 2)
+      const nextSlot = getMatchSlot(nextRound, nextIdx, totalRounds)
+      const x2 = (r + 1) * roundWidth
+      const y2 = headerHeight + nextSlot * slotHeight + matchHeight / 2
+
+      const midX = (x1 + x2) / 2
+      paths.push(`M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`)
+    })
+  }
+
+  const totalWidth = rounds.length * roundWidth
+  const totalHeight = totalSlots * slotHeight + headerHeight
+
+  return (
+    <svg
+      className="absolute top-0 left-0 pointer-events-none"
+      width={totalWidth}
+      height={totalHeight}
+      style={{ zIndex: 0 }}
+    >
+      {paths.map((d, i) => (
+        <path
+          key={i}
+          d={d}
+          fill="none"
+          stroke="rgb(147 51 234 / 0.5)"
+          strokeWidth="2"
+          strokeDasharray="6 4"
+        />
+      ))}
+    </svg>
   )
 }
 

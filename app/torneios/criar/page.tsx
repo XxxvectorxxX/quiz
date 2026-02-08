@@ -26,6 +26,12 @@ export default async function CriarTorneioPage() {
     "use server"
     const supabase = await createClient()
 
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    let inviteCode = ""
+    for (let i = 0; i < 8; i++) {
+      inviteCode += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+
     const name = formData.get("name") as string
     const competitionMode = formData.get("competition_mode") as string
     const maxTeams = Number.parseInt(formData.get("max_teams") as string)
@@ -36,6 +42,7 @@ export default async function CriarTorneioPage() {
         name,
         competition_mode: competitionMode,
         max_teams: maxTeams,
+        invite_code: inviteCode,
         created_by: user.id,
       })
       .select()

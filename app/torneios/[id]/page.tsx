@@ -2,7 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Trophy, Users, Crown, Share2 } from "lucide-react"
+import { Trophy, Users, Crown, Share2, Ticket } from "lucide-react"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle, ItemGroup } from "@/components/ui/item"
@@ -144,7 +144,7 @@ export default async function TorneioDetalhePage({ params }: PageProps) {
     <div className="min-h-svh bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
       <header className="border-b bg-white/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4 flex flex-wrap justify-between items-center gap-3">
-          <Link href="/quiz">
+ https://routellm.abacus.ai/v1/chat/completions         <Link href="/quiz">
             <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
               Quiz Bíblico
             </h1>
@@ -172,12 +172,18 @@ export default async function TorneioDetalhePage({ params }: PageProps) {
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <CardTitle className="text-3xl mb-2">{tournament.name}</CardTitle>
-                <CardDescription className="flex items-center gap-4 text-base">
+                <CardDescription className="flex flex-wrap items-center gap-4 text-base">
                   <span className="flex items-center gap-1">
                     <Users className="h-4 w-4" />
                     {participants?.length || 0}/{tournament.max_teams} equipes
                   </span>
                   <span>Modo: {tournament.competition_mode.toUpperCase()}</span>
+                  {tournament.status === "registration" && tournament.invite_code && (
+                    <span className="flex items-center gap-2 bg-purple-50 px-3 py-1.5 rounded-lg border border-purple-200">
+                      <Ticket className="h-4 w-4 text-purple-600" />
+                      Código para equipes: <strong className="font-mono text-lg text-purple-700">{tournament.invite_code}</strong>
+                    </span>
+                  )}
                 </CardDescription>
               </div>
               <Badge

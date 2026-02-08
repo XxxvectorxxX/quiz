@@ -3,8 +3,9 @@ import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Trophy, Users, Ticket, Share2 } from "lucide-react"
+import { Trophy, Users, Share2 } from "lucide-react"
 import Link from "next/link"
+import { TournamentInviteCodeEntry } from "@/components/TournamentInviteCodeEntry"
 
 export default async function TorneiosPage() {
   const supabase = await createClient()
@@ -74,18 +75,13 @@ export default async function TorneiosPage() {
           <div>
             <h2 className="text-3xl font-bold">Torneios</h2>
             <p className="text-muted-foreground">
-              Participe de torneios com chaveamento. Use o código de convite na página inicial ou escolha um torneio abaixo.
+              Participe de torneios com chaveamento. Digite o código de convite abaixo ou escolha um torneio da lista.
             </p>
           </div>
         </div>
 
         <div className="mb-6">
-          <Button variant="outline" asChild>
-            <Link href="/">
-              <Ticket className="h-4 w-4 mr-2" />
-              Entrar com código de convite (página inicial)
-            </Link>
-          </Button>
+          <TournamentInviteCodeEntry variant="outline" />
         </div>
 
         <Card>
