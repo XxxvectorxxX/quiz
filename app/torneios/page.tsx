@@ -29,7 +29,7 @@ export default async function TorneiosPage() {
       competition_mode,
       max_teams,
       invite_code,
-      created_at,
+      created_by,
       tournament_participants (count),
       winner:teams!tournaments_winner_team_id_fkey (id, name, color)
     `,
