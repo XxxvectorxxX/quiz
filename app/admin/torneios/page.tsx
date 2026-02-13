@@ -8,7 +8,7 @@ import Link from "next/link"
 import { revalidatePath } from "next/cache"
 import { DeleteTournamentButton } from "@/components/DeleteTournamentButton"
 
-// Opcional: evita cache e ajuda a lista atualizar sempre
+// Evita cache e ajuda a lista atualizar sempre
 export const dynamic = "force-dynamic"
 
 async function deleteTournamentAction(tournamentId: string) {
@@ -23,8 +23,10 @@ async function deleteTournamentAction(tournamentId: string) {
   const { data: profile } = await supabase.from("profiles").select("is_admin").eq("id", user.id).single()
   if (!profile?.is_admin) return
 
+  // Se no seu schema a tabela correta for tournament_teams, apague ela também
+  // (mantive tournament_participants se você realmente tiver essa tabela; caso não tenha, troque para tournament_teams)
   await supabase.from("tournament_matches").delete().eq("tournament_id", tournamentId)
-  await supabase.from("tournament_participants").delete().eq("tournament_id", tournamentId)
+  await supabase.from("tournament_teams").delete().eq("tournament_id", tournamentId)
   await supabase.from("tournaments").delete().eq("id", tournamentId)
 
   revalidatePath("/admin/torneios")
@@ -53,7 +55,7 @@ export default async function AdminTorneiosPage() {
     .select(
       `
       *,
-      tournament_participants(count),
+      tournament_teams(count),
       winner:teams!tournaments_winner_team_id_fkey (
         id,
         name,
@@ -159,7 +161,7 @@ export default async function AdminTorneiosPage() {
               ) : (
                 <div className="space-y-4">
                   {tournaments.map((tournament: any) => {
-                    const participantCount = tournament.tournament_participants?.[0]?.count ?? 0
+                    const participantCount = tournament.tournament_teams?.[0]?.count ?? 0
 
                     const statusInfo =
                       statusMap[tournament.status] ??
