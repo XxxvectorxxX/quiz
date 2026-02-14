@@ -42,6 +42,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
+{/*
   // Redirect to onboarding if user doesn't have profile
   if (user && !request.nextUrl.pathname.startsWith("/auth") && !request.nextUrl.pathname.startsWith("/onboarding")) {
     const { data: profile } = await supabase.from("profiles").select("id").eq("id", user.id).single()
@@ -52,6 +53,6 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url)
     }
   }
-
+  */}
   return supabaseResponse
 }
