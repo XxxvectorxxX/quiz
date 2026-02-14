@@ -1,36 +1,73 @@
-// app/admin/equipes/page.tsx
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { UserAutocomplete } from "@/components/admin/UserAutocomplete";
+import { AddMemberForm } from "@/components/admin/AddMemberForm";
 
 async function requireAdmin() {
   const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) throw new Error("401");
 
-  const { data: isAdmin } = await supabase.rpc("current_user_is_admin");
-  if (!isAdmin) throw new Error("403");
-  return supabase;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+
+  const { data: isAdmin, error: adminErr } = await supabase.rpc("current_user_is_admin");
+  if (adminErr) throw new Error(adminErr.message);
+  if (!isAdmin) redirect("/"); // ou /403
+
+  return { supabase, user };
 }
 
 export default async function AdminTeamsPage() {
-  const supabase = await requireAdmin();
+  const { supabase, user } = await requireAdmin();
 
-  const { data: teams } = await supabase
+  const { data: teams, error: teamsErr } = await supabase
     .from("teams")
     .select("id,name,color,leader_id,competition_mode,created_at")
     .order("created_at", { ascending: false });
 
+  if (teamsErr) throw new Error(teamsErr.message);
+
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Admin • Equipes</h1>
-      </div>
+      <h1 className="text-2xl font-semibold">Admin • Equipes</h1>
 
-      <CreateTeamCard />
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Criar equipe</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form
+            className="grid gap-3 md:grid-cols-3"
+            action={async (formData) => {
+              "use server";
+              const { supabase, user } = await requireAdmin();
+              const name = String(formData.get("name") ?? "").trim();
+              const color = String(formData.get("color") ?? "").trim();
+
+              if (name.length < 2) throw new Error("Nome inválido");
+
+              const { error } = await supabase.from("teams").insert({
+                name,
+                color: color || null,
+                leader_id: user.id,
+                competition_mode: "tournament",
+              });
+
+              if (error) throw new Error(error.message);
+              revalidatePath("/admin/equipes");
+            }}
+          >
+            <Input name="name" placeholder="Nome" required />
+            <Input name="color" placeholder="#RRGGBB (opcional)" />
+            <Button type="submit">Criar</Button>
+          </form>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4">
         {(teams ?? []).map((t) => (
@@ -46,16 +83,16 @@ export default async function AdminTeamsPage() {
               <form
                 action={async () => {
                   "use server";
-                  const supabase = await requireAdmin();
-                  // cascade via FK
-                  await supabase.from("teams").delete().eq("id", t.id);
+                  const { supabase } = await requireAdmin();
+                  const { error } = await supabase.from("teams").delete().eq("id", t.id);
+                  if (error) throw new Error(error.message);
                   revalidatePath("/admin/equipes");
                 }}
               >
                 <Button
                   variant="destructive"
                   onClick={(e) => {
-                    // @ts-expect-error server action form confirm
+                    // @ts-expect-error confirm
                     if (!confirm("Excluir equipe? Isso apagará membros e vínculos (cascade).")) e.preventDefault();
                   }}
                 >
@@ -74,53 +111,33 @@ export default async function AdminTeamsPage() {
   );
 }
 
-function CreateTeamCard() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Criar equipe</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form
-          className="grid gap-3 md:grid-cols-3"
-          action={async (formData) => {
-            "use server";
-            const supabase = await requireAdmin();
-            const name = String(formData.get("name") ?? "").trim();
-            const color = String(formData.get("color") ?? "").trim();
-
-            if (name.length < 2) throw new Error("Nome inválido");
-
-            const { data: userData } = await supabase.auth.getUser();
-            const leader_id = userData.user!.id;
-
-            await supabase.from("teams").insert({
-              name,
-              color: color || null,
-              leader_id,
-              competition_mode: "tournament",
-            });
-
-            revalidatePath("/admin/equipes");
-          }}
-        >
-          <Input name="name" placeholder="Nome" required />
-          <Input name="color" placeholder="#RRGGBB (opcional)" />
-          <Button type="submit">Criar</Button>
-        </form>
-      </CardContent>
-    </Card>
-  );
-}
-
 async function TeamMembers({ teamId }: { teamId: string }) {
-  const supabase = await requireAdmin();
+  const { supabase } = await requireAdmin();
 
-  const { data: members } = await supabase
+  const { data: members, error } = await supabase
     .from("team_members")
     .select("id,user_id,role,joined_at,profiles:profiles(id,full_name,email)")
     .eq("team_id", teamId)
     .order("joined_at", { ascending: true });
+
+  if (error) throw new Error(error.message);
+
+  async function addMemberAction(formData: FormData) {
+    "use server";
+    const { supabase } = await requireAdmin();
+    const team_id = String(formData.get("team_id") ?? "");
+    const user_id = String(formData.get("user_id") ?? "");
+    if (!team_id || !user_id) throw new Error("Selecione um usuário.");
+
+    const { error } = await supabase.from("team_members").insert({
+      team_id,
+      user_id,
+      role: "member",
+    });
+
+    if (error) throw new Error(error.message);
+    revalidatePath("/admin/equipes");
+  }
 
   return (
     <div className="space-y-3">
@@ -136,15 +153,16 @@ async function TeamMembers({ teamId }: { teamId: string }) {
 
         {(members ?? []).map((m) => (
           <div key={m.id} className="grid grid-cols-12 gap-2 p-2 text-sm">
-            <div className="col-span-6">{m.profiles?.full_name ?? m.user_id}</div>
-            <div className="col-span-3">{m.profiles?.email ?? "—"}</div>
+            <div className="col-span-6">{(m as any).profiles?.full_name ?? m.user_id}</div>
+            <div className="col-span-3">{(m as any).profiles?.email ?? "—"}</div>
             <div className="col-span-2">{m.role}</div>
             <div className="col-span-1 text-right">
               <form
                 action={async () => {
                   "use server";
-                  const supabase = await requireAdmin();
-                  await supabase.from("team_members").delete().eq("id", m.id);
+                  const { supabase } = await requireAdmin();
+                  const { error } = await supabase.from("team_members").delete().eq("id", m.id);
+                  if (error) throw new Error(error.message);
                   revalidatePath("/admin/equipes");
                 }}
               >
@@ -157,71 +175,14 @@ async function TeamMembers({ teamId }: { teamId: string }) {
         ))}
       </div>
 
-      <AddMember teamId={teamId} />
-    </div>
-  );
-}
-
-function AddMember({ teamId }: { teamId: string }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Adicionar membro</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <ClientAddMember teamId={teamId} />
-      </CardContent>
-    </Card>
-  );
-}
-
-function ClientAddMember({ teamId }: { teamId: string }) {
-  // Client wrapper embutido via "use client" em componente separado:
-  // Para manter o arquivo simples, usamos um truque: renderizar um componente client aqui.
-  return (
-    // @ts-expect-error Server->Client boundary
-    <ClientAddMemberInner teamId={teamId} />
-  );
-}
-
-// -------- CLIENT COMPONENT INLINE (Next permite se separado; aqui fica no mesmo arquivo por praticidade) ----------
-import React from "react";
-import { createClient as createBrowserClient } from "@/lib/supabase/client";
-function ClientAddMemberInner({ teamId }: { teamId: string }) {
-  "use client";
-  const supabase = React.useMemo(() => createBrowserClient(), []);
-  const [picked, setPicked] = React.useState<{ id: string; full_name: string | null; email: string | null } | null>(
-    null
-  );
-
-  async function add() {
-    if (!picked) return;
-    const res = await fetch("/admin/equipes", { method: "POST" }).catch(() => null);
-    void res;
-  }
-
-  return (
-    <div className="space-y-3">
-      <UserAutocomplete onSelect={(u) => setPicked(u)} />
-      {picked && (
-        <form
-          action={async () => {
-            "use server";
-            const supabase = await requireAdmin();
-            await supabase.from("team_members").insert({
-              team_id: teamId,
-              user_id: picked.id,
-              role: "member",
-            });
-            revalidatePath("/admin/equipes");
-          }}
-        >
-          <div className="text-sm">
-            Selecionado: <b>{picked.full_name ?? "Sem nome"}</b> ({picked.email ?? "sem email"})
-          </div>
-          <Button type="submit">Confirmar adicionar</Button>
-        </form>
-      )}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Adicionar membro</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <AddMemberForm teamId={teamId} addMemberAction={addMemberAction} />
+        </CardContent>
+      </Card>
     </div>
   );
 }
