@@ -1,5 +1,5 @@
-"use client";
-
+// components/OrganizationJoin.tsx
+'use client';
 
 import { useState } from 'react';
 import { Church, Users } from 'lucide-react';

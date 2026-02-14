@@ -1,4 +1,5 @@
-"use client";
+// components/AdminPanel.tsx
+'use client';
 
 import { useState } from 'react';
 import { Trash2, Shield, Search } from 'lucide-react';

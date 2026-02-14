@@ -1,5 +1,5 @@
-"use client";
-
+// components/LiveMatch.tsx
+'use client';
 
 import { useState, useEffect } from 'react';
 import { Timer, Users, Eye } from 'lucide-react';

@@ -2,19 +2,21 @@
 
 import type React from "react"
 import { Suspense, useState } from "react"
+
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 
 function LoginForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get("redirect") || "/quiz"
 
@@ -25,14 +27,15 @@ function LoginForm() {
     setError(null)
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
       if (error) throw error
-
-      // Hard redirect pra garantir sessão/cookie no SSR e evitar loop
-      const target = redirectTo.startsWith("/") ? redirectTo : "/quiz"
-      window.location.href = target
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Erro ao fazer login")
+      router.push(redirectTo.startsWith("/") ? redirectTo : "/quiz")
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "Erro ao fazer login")
+    } finally {
       setIsLoading(false)
     }
   }
@@ -45,7 +48,6 @@ function LoginForm() {
             <h1 className="text-4xl font-bold text-blue-600 mb-2">Quiz Bíblico</h1>
             <p className="text-muted-foreground">Teste seus conhecimentos sobre a Palavra</p>
           </div>
-
           <Card>
             <CardHeader>
               <CardTitle className="text-2xl">Entrar</CardTitle>
@@ -65,7 +67,6 @@ function LoginForm() {
                       onChange={(e) => setEmail(e.target.value)}
                     />
                   </div>
-
                   <div className="grid gap-2">
                     <Label htmlFor="password">Senha</Label>
                     <Input
@@ -76,14 +77,11 @@ function LoginForm() {
                       onChange={(e) => setPassword(e.target.value)}
                     />
                   </div>
-
                   {error && <p className="text-sm text-destructive">{error}</p>}
-
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? "Entrando..." : "Entrar"}
                   </Button>
                 </div>
-
                 <div className="mt-4 text-center text-sm">
                   Não tem uma conta?{" "}
                   <Link href="/auth/cadastro" className="underline underline-offset-4 text-blue-600 font-medium">
