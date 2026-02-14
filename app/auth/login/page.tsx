@@ -2,7 +2,6 @@
 
 import type React from "react"
 import { Suspense, useState } from "react"
-
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -29,11 +28,11 @@ function LoginForm() {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
 
-      // ✅ hard redirect (evita loop do middleware)
+      // Hard redirect pra garantir sessão/cookie no SSR e evitar loop
       const target = redirectTo.startsWith("/") ? redirectTo : "/quiz"
       window.location.href = target
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "Erro ao fazer login")
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Erro ao fazer login")
       setIsLoading(false)
     }
   }
@@ -46,6 +45,7 @@ function LoginForm() {
             <h1 className="text-4xl font-bold text-blue-600 mb-2">Quiz Bíblico</h1>
             <p className="text-muted-foreground">Teste seus conhecimentos sobre a Palavra</p>
           </div>
+
           <Card>
             <CardHeader>
               <CardTitle className="text-2xl">Entrar</CardTitle>
@@ -65,6 +65,7 @@ function LoginForm() {
                       onChange={(e) => setEmail(e.target.value)}
                     />
                   </div>
+
                   <div className="grid gap-2">
                     <Label htmlFor="password">Senha</Label>
                     <Input
@@ -75,11 +76,14 @@ function LoginForm() {
                       onChange={(e) => setPassword(e.target.value)}
                     />
                   </div>
+
                   {error && <p className="text-sm text-destructive">{error}</p>}
+
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? "Entrando..." : "Entrar"}
                   </Button>
                 </div>
+
                 <div className="mt-4 text-center text-sm">
                   Não tem uma conta?{" "}
                   <Link href="/auth/cadastro" className="underline underline-offset-4 text-blue-600 font-medium">
@@ -97,7 +101,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense:
+    <Suspense
       fallback={
         <div className="flex min-h-svh w-full items-center justify-center p-6 bg-gradient-to-br from-blue-50 via-white to-purple-50">
           <div className="w-full max-w-sm">
