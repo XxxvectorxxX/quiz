@@ -97,7 +97,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense
+    <Suspense:
       fallback={
         <div className="flex min-h-svh w-full items-center justify-center p-6 bg-gradient-to-br from-blue-50 via-white to-purple-50">
           <div className="w-full max-w-sm">

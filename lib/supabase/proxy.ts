@@ -2,9 +2,7 @@ import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  })
+  let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,44 +13,30 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({
-            request,
+          // não precisa setar em request.cookies; só no response
+          cookiesToSet.forEach(({ name, value, options }) => {
+            supabaseResponse.cookies.set(name, value, options)
           })
-          cookiesToSet.forEach(({ name, value, options }) => supabaseResponse.cookies.set(name, value, options))
         },
       },
     },
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
 
-  // Redirect to login if accessing protected routes without auth
-  if (
-    (request.nextUrl.pathname.startsWith("/quiz") ||
-      request.nextUrl.pathname.startsWith("/dashboard") ||
-      request.nextUrl.pathname.startsWith("/competicoes") ||
-      request.nextUrl.pathname.startsWith("/admin")) &&
-    !user
-  ) {
+  const path = request.nextUrl.pathname
+  const isProtected =
+    path.startsWith("/quiz") ||
+    path.startsWith("/dashboard") ||
+    path.startsWith("/competicoes") ||
+    path.startsWith("/admin")
+
+  if (isProtected && !user) {
     const url = request.nextUrl.clone()
     url.pathname = "/auth/login"
+    url.searchParams.set("redirect", path) // ajuda você voltar após login
     return NextResponse.redirect(url)
   }
 
-{/*
-  // Redirect to onboarding if user doesn't have profile
-  if (user && !request.nextUrl.pathname.startsWith("/auth") && !request.nextUrl.pathname.startsWith("/onboarding")) {
-    const { data: profile } = await supabase.from("profiles").select("id").eq("id", user.id).single()
-
-    if (!profile && !request.nextUrl.pathname.startsWith("/onboarding")) {
-      const url = request.nextUrl.clone()
-      url.pathname = "/onboarding"
-      return NextResponse.redirect(url)
-    }
-  }
-  */}
   return supabaseResponse
 }
