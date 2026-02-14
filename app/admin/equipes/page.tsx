@@ -1,269 +1,227 @@
-import { redirect } from "next/navigation"
-import Link from "next/link"
-import { revalidatePath } from "next/cache"
-import { createClient } from "@/lib/supabase/server"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { ArrowLeft, Plus, UserPlus, Trash2 } from "lucide-react"
+// app/admin/equipes/page.tsx
+import { revalidatePath } from "next/cache";
+import { createClient } from "@/lib/supabase/server";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { UserAutocomplete } from "@/components/admin/UserAutocomplete";
 
-export const dynamic = "force-dynamic"
+async function requireAdmin() {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) throw new Error("401");
 
-async function assertAdmin() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) redirect("/auth/login")
-
-  const { data: profile } = await supabase.from("profiles").select("id,is_admin").eq("id", user.id).single()
-  if (!profile?.is_admin) redirect("/quiz")
-
-  return { supabase, user }
+  const { data: isAdmin } = await supabase.rpc("current_user_is_admin");
+  if (!isAdmin) throw new Error("403");
+  return supabase;
 }
 
-async function createTeamAction(formData: FormData) {
-  "use server"
-  const { supabase } = await assertAdmin()
+export default async function AdminTeamsPage() {
+  const supabase = await requireAdmin();
 
-  const name = String(formData.get("name") || "").trim()
-  const color = String(formData.get("color") || "#7c3aed").trim()
-  const leaderId = String(formData.get("leader_id") || "").trim() // opcional
-
-  if (!name) return
-
-  // se você quiser que admin defina o leader, mande leader_id
-  // se não mandar, o default no banco pode preencher (auth.uid())
-  const payload: any = { name, color }
-  if (leaderId) payload.leader_id = leaderId
-
-  await supabase.from("teams").insert(payload)
-
-  revalidatePath("/admin/equipes")
-}
-
-async function addMemberAction(formData: FormData) {
-  "use server"
-  const { supabase } = await assertAdmin()
-
-  const teamId = String(formData.get("team_id") || "")
-  const userId = String(formData.get("user_id") || "").trim()
-  const role = String(formData.get("role") || "member").trim()
-
-  if (!teamId || !userId) return
-
-  await supabase.from("team_members").insert({
-    team_id: teamId,
-    user_id: userId,
-    role,
-  })
-
-  revalidatePath("/admin/equipes")
-}
-
-async function removeMemberAction(formData: FormData) {
-  "use server"
-  const { supabase } = await assertAdmin()
-
-  const teamId = String(formData.get("team_id") || "")
-  const userId = String(formData.get("user_id") || "")
-
-  if (!teamId || !userId) return
-
-  await supabase.from("team_members").delete().eq("team_id", teamId).eq("user_id", userId)
-
-  revalidatePath("/admin/equipes")
-}
-
-export default async function EquipesAdminPage() {
-  const { supabase } = await assertAdmin()
-
-  const { data: teams, error } = await supabase
+  const { data: teams } = await supabase
     .from("teams")
-    .select(
-      `
-      *,
-      profiles!teams_leader_id_fkey (id, full_name),
-      team_rankings (total_points, total_wins, total_matches),
-      team_members (
-        user_id,
-        role,
-        profiles:profiles!team_members_user_id_fkey (id, full_name)
-      )
-    `,
-    )
-    .order("created_at", { ascending: false })
+    .select("id,name,color,leader_id,competition_mode,created_at")
+    .order("created_at", { ascending: false });
 
-  if (error) {
-    return (
-      <div className="min-h-svh bg-gradient-to-br from-slate-50 via-white to-blue-50">
-        <div className="container mx-auto px-4 py-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>Erro ao carregar equipes</CardTitle>
+  return (
+    <div className="mx-auto max-w-5xl space-y-6 p-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Admin • Equipes</h1>
+      </div>
+
+      <CreateTeamCard />
+
+      <div className="grid gap-4">
+        {(teams ?? []).map((t) => (
+          <Card key={t.id}>
+            <CardHeader className="flex-row items-center justify-between">
+              <CardTitle className="text-base">
+                {t.name}{" "}
+                <span className="ml-2 rounded px-2 py-1 text-xs" style={{ background: t.color ?? "#eee" }}>
+                  {t.color ?? "sem cor"}
+                </span>
+              </CardTitle>
+
+              <form
+                action={async () => {
+                  "use server";
+                  const supabase = await requireAdmin();
+                  // cascade via FK
+                  await supabase.from("teams").delete().eq("id", t.id);
+                  revalidatePath("/admin/equipes");
+                }}
+              >
+                <Button
+                  variant="destructive"
+                  onClick={(e) => {
+                    // @ts-expect-error server action form confirm
+                    if (!confirm("Excluir equipe? Isso apagará membros e vínculos (cascade).")) e.preventDefault();
+                  }}
+                >
+                  Excluir
+                </Button>
+              </form>
             </CardHeader>
-            <CardContent>
-              <pre className="text-xs overflow-auto border rounded bg-white p-3">{JSON.stringify(error, null, 2)}</pre>
+
+            <CardContent className="space-y-4">
+              <TeamMembers teamId={t.id} />
             </CardContent>
           </Card>
-        </div>
+        ))}
       </div>
-    )
+    </div>
+  );
+}
+
+function CreateTeamCard() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Criar equipe</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form
+          className="grid gap-3 md:grid-cols-3"
+          action={async (formData) => {
+            "use server";
+            const supabase = await requireAdmin();
+            const name = String(formData.get("name") ?? "").trim();
+            const color = String(formData.get("color") ?? "").trim();
+
+            if (name.length < 2) throw new Error("Nome inválido");
+
+            const { data: userData } = await supabase.auth.getUser();
+            const leader_id = userData.user!.id;
+
+            await supabase.from("teams").insert({
+              name,
+              color: color || null,
+              leader_id,
+              competition_mode: "tournament",
+            });
+
+            revalidatePath("/admin/equipes");
+          }}
+        >
+          <Input name="name" placeholder="Nome" required />
+          <Input name="color" placeholder="#RRGGBB (opcional)" />
+          <Button type="submit">Criar</Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+async function TeamMembers({ teamId }: { teamId: string }) {
+  const supabase = await requireAdmin();
+
+  const { data: members } = await supabase
+    .from("team_members")
+    .select("id,user_id,role,joined_at,profiles:profiles(id,full_name,email)")
+    .eq("team_id", teamId)
+    .order("joined_at", { ascending: true });
+
+  return (
+    <div className="space-y-3">
+      <div className="text-sm font-medium">Membros</div>
+
+      <div className="rounded-md border">
+        <div className="grid grid-cols-12 gap-2 border-b p-2 text-xs text-muted-foreground">
+          <div className="col-span-6">Usuário</div>
+          <div className="col-span-3">Email</div>
+          <div className="col-span-2">Role</div>
+          <div className="col-span-1" />
+        </div>
+
+        {(members ?? []).map((m) => (
+          <div key={m.id} className="grid grid-cols-12 gap-2 p-2 text-sm">
+            <div className="col-span-6">{m.profiles?.full_name ?? m.user_id}</div>
+            <div className="col-span-3">{m.profiles?.email ?? "—"}</div>
+            <div className="col-span-2">{m.role}</div>
+            <div className="col-span-1 text-right">
+              <form
+                action={async () => {
+                  "use server";
+                  const supabase = await requireAdmin();
+                  await supabase.from("team_members").delete().eq("id", m.id);
+                  revalidatePath("/admin/equipes");
+                }}
+              >
+                <Button variant="ghost" size="sm">
+                  Remover
+                </Button>
+              </form>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <AddMember teamId={teamId} />
+    </div>
+  );
+}
+
+function AddMember({ teamId }: { teamId: string }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Adicionar membro</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <ClientAddMember teamId={teamId} />
+      </CardContent>
+    </Card>
+  );
+}
+
+function ClientAddMember({ teamId }: { teamId: string }) {
+  // Client wrapper embutido via "use client" em componente separado:
+  // Para manter o arquivo simples, usamos um truque: renderizar um componente client aqui.
+  return (
+    // @ts-expect-error Server->Client boundary
+    <ClientAddMemberInner teamId={teamId} />
+  );
+}
+
+// -------- CLIENT COMPONENT INLINE (Next permite se separado; aqui fica no mesmo arquivo por praticidade) ----------
+import React from "react";
+import { createClient as createBrowserClient } from "@/lib/supabase/client";
+function ClientAddMemberInner({ teamId }: { teamId: string }) {
+  "use client";
+  const supabase = React.useMemo(() => createBrowserClient(), []);
+  const [picked, setPicked] = React.useState<{ id: string; full_name: string | null; email: string | null } | null>(
+    null
+  );
+
+  async function add() {
+    if (!picked) return;
+    const res = await fetch("/admin/equipes", { method: "POST" }).catch(() => null);
+    void res;
   }
 
   return (
-    <div className="min-h-svh bg-gradient-to-br from-slate-50 via-white to-blue-50">
-      <header className="border-b bg-white/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/admin">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Voltar
-            </Link>
-          </Button>
-          <h2 className="text-xl font-bold">Gerenciar Equipes</h2>
-          <div />
-        </div>
-      </header>
-
-      <div className="container mx-auto px-4 py-8 space-y-6">
-        {/* Criar equipe */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Plus className="h-5 w-5" />
-              Criar equipe
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form action={createTeamAction} className="grid gap-3 md:grid-cols-4">
-              <div className="md:col-span-2">
-                <label className="text-sm font-medium">Nome</label>
-                <Input name="name" placeholder="Nome da equipe" />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Cor</label>
-                <Input name="color" placeholder="#7c3aed" defaultValue="#7c3aed" />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Leader ID (opcional)</label>
-                <Input name="leader_id" placeholder="UUID do usuário" />
-              </div>
-
-              <div className="md:col-span-4 flex justify-end">
-                <Button type="submit">Criar</Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-
-        {/* Lista */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Todas as Equipes ({teams?.length || 0})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {teams?.map((team: any) => {
-                const ranking = team.team_rankings?.[0]
-                const members = team.team_members ?? []
-
-                return (
-                  <div key={team.id} className="p-4 bg-white rounded-lg border">
-                    <div className="flex items-center justify-between gap-4 flex-wrap">
-                      <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-full border" style={{ backgroundColor: team.color ?? "#999" }} />
-                        <div>
-                          <p className="font-semibold">{team.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Líder: {team.profiles?.full_name || "Desconhecido"}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <Badge variant="outline">{String(team.competition_mode || "—").toUpperCase()}</Badge>
-                        {ranking ? (
-                          <div className="text-right text-xs text-muted-foreground">
-                            <p>
-                              {ranking.total_points} pts • {ranking.total_wins} vitórias
-                            </p>
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    {/* Membros */}
-                    <div className="mt-4 grid gap-3 md:grid-cols-2">
-                      <div className="rounded-lg border bg-muted/30 p-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="font-medium">Membros ({members.length})</p>
-                        </div>
-
-                        {members.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">Nenhum membro adicionado ainda.</p>
-                        ) : (
-                          <div className="space-y-2">
-                            {members.map((m: any) => (
-                              <div key={m.user_id} className="flex items-center justify-between bg-white rounded border p-2">
-                                <div>
-                                  <p className="text-sm font-medium">{m.profiles?.full_name ?? m.user_id}</p>
-                                  <p className="text-xs text-muted-foreground">{m.role}</p>
-                                </div>
-
-                                <form action={removeMemberAction}>
-                                  <input type="hidden" name="team_id" value={team.id} />
-                                  <input type="hidden" name="user_id" value={m.user_id} />
-                                  <Button type="submit" size="sm" variant="destructive">
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </form>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Adicionar membro */}
-                      <div className="rounded-lg border bg-muted/30 p-3">
-                        <p className="font-medium mb-2 flex items-center gap-2">
-                          <UserPlus className="h-4 w-4" />
-                          Adicionar membro
-                        </p>
-
-                        <form action={addMemberAction} className="space-y-2">
-                          <input type="hidden" name="team_id" value={team.id} />
-
-                          <div>
-                            <label className="text-sm font-medium">User ID</label>
-                            <Input name="user_id" placeholder="UUID do usuário" />
-                          </div>
-
-                          <div>
-                            <label className="text-sm font-medium">Role</label>
-                            <select name="role" className="h-10 w-full rounded-md border bg-white px-3 text-sm" defaultValue="member">
-                              <option value="member">member</option>
-                              <option value="co_leader">co_leader</option>
-                            </select>
-                          </div>
-
-                          <div className="flex justify-end">
-                            <Button type="submit" variant="outline">
-                              Adicionar
-                            </Button>
-                          </div>
-                        </form>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+    <div className="space-y-3">
+      <UserAutocomplete onSelect={(u) => setPicked(u)} />
+      {picked && (
+        <form
+          action={async () => {
+            "use server";
+            const supabase = await requireAdmin();
+            await supabase.from("team_members").insert({
+              team_id: teamId,
+              user_id: picked.id,
+              role: "member",
+            });
+            revalidatePath("/admin/equipes");
+          }}
+        >
+          <div className="text-sm">
+            Selecionado: <b>{picked.full_name ?? "Sem nome"}</b> ({picked.email ?? "sem email"})
+          </div>
+          <Button type="submit">Confirmar adicionar</Button>
+        </form>
+      )}
     </div>
-  )
+  );
 }
