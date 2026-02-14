@@ -1,27 +1,40 @@
 // app/admin/torneios/page.tsx
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ConfirmSubmitButton } from "@/components/admin/ConfirmSubmitButton";
 
 async function requireAdmin() {
   const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) throw new Error("401");
-  const { data: isAdmin } = await supabase.rpc("current_user_is_admin");
-  if (!isAdmin) throw new Error("403");
-  return supabase;
+
+  const {
+    data: { user },
+    error: userErr,
+  } = await supabase.auth.getUser();
+
+  if (userErr) throw new Error(userErr.message);
+  if (!user) redirect("/login");
+
+  const { data: isAdmin, error: adminErr } = await supabase.rpc("current_user_is_admin");
+  if (adminErr) throw new Error(adminErr.message);
+  if (!isAdmin) redirect("/");
+
+  return { supabase, user };
 }
 
 export default async function AdminTournamentsPage() {
-  const supabase = await requireAdmin();
+  const { supabase } = await requireAdmin();
 
-  const { data: tournaments } = await supabase
+  const { data: tournaments, error } = await supabase
     .from("tournaments")
     .select("id,name,status,starts_at,created_at,max_teams,question_time_seconds")
     .order("created_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6">
@@ -38,14 +51,15 @@ export default async function AdminTournamentsPage() {
             className="grid gap-3 md:grid-cols-4"
             action={async (formData) => {
               "use server";
-              const supabase = await requireAdmin();
+              const { supabase, user } = await requireAdmin();
+
               const name = String(formData.get("name") ?? "").trim();
               const maxTeams = Number(formData.get("max_teams") ?? 8);
               const qtime = Number(formData.get("question_time_seconds") ?? 30);
 
               if (name.length < 2) throw new Error("Nome inválido");
-
-              const { data: me } = await supabase.auth.getUser();
+              if (!Number.isFinite(maxTeams) || maxTeams < 2) throw new Error("max_teams inválido");
+              if (!Number.isFinite(qtime) || qtime < 5) throw new Error("question_time_seconds inválido");
 
               const { data: created, error } = await supabase
                 .from("tournaments")
@@ -56,14 +70,16 @@ export default async function AdminTournamentsPage() {
                   status: "draft",
                   max_teams: maxTeams,
                   question_time_seconds: qtime,
-                  created_by: me.user!.id,
+                  created_by: user.id,
                 })
                 .select("id")
                 .single();
 
-              if (error) throw error;
+              if (error) throw new Error(error.message);
+              if (!created?.id) throw new Error("Falha ao criar torneio.");
 
               revalidatePath("/admin/torneios");
+              redirect(`/admin/torneios/${created.id}`); // ✅ B
             }}
           >
             <Input name="name" placeholder="Nome" required />
@@ -79,6 +95,7 @@ export default async function AdminTournamentsPage() {
           <Card key={t.id}>
             <CardHeader className="flex-row items-center justify-between">
               <CardTitle className="text-base">{t.name}</CardTitle>
+
               <div className="flex gap-2">
                 <Button asChild variant="secondary">
                   <Link href={`/admin/torneios/${t.id}`}>Abrir</Link>
@@ -87,23 +104,24 @@ export default async function AdminTournamentsPage() {
                 <form
                   action={async () => {
                     "use server";
-                    const supabase = await requireAdmin();
-                    await supabase.from("tournaments").delete().eq("id", t.id);
+                    const { supabase } = await requireAdmin();
+
+                    const { error } = await supabase.from("tournaments").delete().eq("id", t.id);
+                    if (error) throw new Error(error.message);
+
                     revalidatePath("/admin/torneios");
                   }}
                 >
-                  <Button
+                  <ConfirmSubmitButton
                     variant="destructive"
-                    onClick={(e) => {
-                      // @ts-expect-error
-                      if (!confirm("Excluir torneio? Isso remove matches/pivots (cascade).")) e.preventDefault();
-                    }}
+                    confirmText="Excluir torneio? Isso removerá dados em cascade."
                   >
                     Excluir
-                  </Button>
+                  </ConfirmSubmitButton>
                 </form>
               </div>
             </CardHeader>
+
             <CardContent className="text-sm text-muted-foreground">
               Status: {t.status} • max_teams: {t.max_teams} • tempo: {t.question_time_seconds}s
             </CardContent>
