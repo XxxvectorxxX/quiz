@@ -13,7 +13,6 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          // não precisa setar em request.cookies; só no response
           cookiesToSet.forEach(({ name, value, options }) => {
             supabaseResponse.cookies.set(name, value, options)
           })
@@ -22,9 +21,13 @@ export async function updateSession(request: NextRequest) {
     },
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   const path = request.nextUrl.pathname
+
+  /*
   const isProtected =
     path.startsWith("/quiz") ||
     path.startsWith("/dashboard") ||
@@ -34,9 +37,13 @@ export async function updateSession(request: NextRequest) {
   if (isProtected && !user) {
     const url = request.nextUrl.clone()
     url.pathname = "/auth/login"
-    url.searchParams.set("redirect", path) // ajuda você voltar após login
+    url.searchParams.set("redirect", path)
     return NextResponse.redirect(url)
   }
+  */
+
+  // Middleware agora NÃO protege nenhuma rota
+  // Apenas mantém sessão ativa
 
   return supabaseResponse
 }
