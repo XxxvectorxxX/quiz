@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import { Trophy, Crown, Play, Eye } from "lucide-react"
 import { Button } from "@/components/ui/button"

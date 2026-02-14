@@ -89,15 +89,12 @@ export default async function AdminTeamsPage() {
                   revalidatePath("/admin/equipes");
                 }}
               >
-                <Button
-                  variant="destructive"
-                  onClick={(e) => {
-                    // @ts-expect-error confirm
-                    if (!confirm("Excluir equipe? Isso apagará membros e vínculos (cascade).")) e.preventDefault();
-                  }}
-                >
-                  Excluir
-                </Button>
+                <ConfirmSubmitButton
+                 variant="destructive"
+                 confirmText="Excluir equipe? Isso apagará membros e vínculos (cascade)."
+                  >
+                   Excluir
+               </ConfirmSubmitButton>
               </form>
             </CardHeader>
 

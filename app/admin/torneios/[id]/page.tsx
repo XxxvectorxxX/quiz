@@ -215,16 +215,9 @@ export default async function AdminTournamentDetailPage({ params }: { params: Pr
                 revalidatePath(`/admin/torneios/${id}`);
               }}
             >
-              <Button
-                type="submit"
-                variant="secondary"
-                onClick={(e) => {
-                  // @ts-expect-error confirm on server-action form
-                  if (!confirm("Gerar/Regenerar bracket? Isso apagará matches atuais.")) e.preventDefault();
-                }}
-              >
+              <CopyButton text={t.invite_code ?? ""} variant="secondary" size="sm">
                 Gerar / Regenerar Bracket
-              </Button>
+              </CopyButton>
             </form>
 
             <form

@@ -1,4 +1,5 @@
-// components/TournamentButton.tsx
+"use client";
+
 import { Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
